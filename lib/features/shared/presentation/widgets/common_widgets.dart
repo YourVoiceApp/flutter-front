@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/yeolpumta_theme.dart';
+
 class WhiteCard extends StatelessWidget {
   const WhiteCard({super.key, required this.child});
 
@@ -49,10 +51,10 @@ Widget quickActionTile({
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF0FF),
+                  color: YeolpumtaTheme.accentSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: const Color(0xFF3B6AF5)),
+                child: Icon(icon, color: YeolpumtaTheme.accent),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -62,7 +64,7 @@ Widget quickActionTile({
                     Text(
                       title,
                       style: const TextStyle(
-                        color: Color(0xFF0F172A),
+                        color: YeolpumtaTheme.textPrimary,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
@@ -71,7 +73,7 @@ Widget quickActionTile({
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        color: Color(0xFF64748B),
+                        color: YeolpumtaTheme.textSecondary,
                         fontSize: 13,
                       ),
                     ),
@@ -81,7 +83,7 @@ Widget quickActionTile({
               Text(
                 trailing,
                 style: const TextStyle(
-                  color: Color(0xFF3B6AF5),
+                  color: YeolpumtaTheme.accent,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -97,7 +99,7 @@ Widget sectionTitle(String value) {
   return Text(
     value,
     style: const TextStyle(
-      color: Color(0xFF0F172A),
+      color: YeolpumtaTheme.textPrimary,
       fontSize: 17,
       fontWeight: FontWeight.w800,
     ),
@@ -111,23 +113,23 @@ InputDecoration fieldDecoration({
 }) {
   return InputDecoration(
     hintText: hint,
-    hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-    prefixIcon: Icon(icon, color: const Color(0xFF3B6AF5)),
+    hintStyle: const TextStyle(color: YeolpumtaTheme.textSecondary),
+    prefixIcon: Icon(icon, color: YeolpumtaTheme.accent),
     suffixIcon: suffix,
     filled: true,
-    fillColor: const Color(0xFFF8FAFC),
+    fillColor: YeolpumtaTheme.bg,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+      borderSide: const BorderSide(color: YeolpumtaTheme.divider),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+      borderSide: const BorderSide(color: YeolpumtaTheme.divider),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: Color(0xFF3B6AF5), width: 1.4),
+      borderSide: const BorderSide(color: YeolpumtaTheme.accent, width: 1.4),
     ),
   );
 }

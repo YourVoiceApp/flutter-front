@@ -128,6 +128,7 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
       status: VoiceJobStatus.uploaded,
       createdAt: DateTime.now(),
       folderId: _folderId,
+      origin: VoiceOrigin.uploaded,
     );
     Navigator.of(context).pop<VoiceJob>(job);
   }

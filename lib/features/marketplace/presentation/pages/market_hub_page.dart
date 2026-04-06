@@ -226,7 +226,7 @@ class _MarketHubPageState extends State<MarketHubPage> {
                           children: [
                             _YeolQuietRow(
                               title: '듣기 화면 광고 끄기',
-                              caption: '듣기 탭과 같은 혜택이에요',
+                              caption: '음성에서 들을 때 나오는 광고와 같아요',
                               trailing: '2,900원',
                               onTap: _openPremium,
                             ),

@@ -5,50 +5,184 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
-import '../../../voices/domain/voice_folder.dart';
-import '../../../voices/domain/voice_job.dart';
+import '../../domain/voice_folder.dart';
+import '../../domain/voice_job.dart';
 
-/// 완료된 음성만 선택 → 어떤 파일인지 표시 → 문장 입력 → 듣기
-class ListenHubPage extends StatefulWidget {
-  const ListenHubPage({
+/// 음성 탭에서 열림 — 「음성 선택」으로 보유 음성을 고른 뒤, 완료된 음성만 TTS 재생
+class VoiceListenPage extends StatefulWidget {
+  const VoiceListenPage({
     super.key,
-    required this.completedJobs,
+    required this.initialJob,
+    required this.allJobs,
     this.folders = const [],
     this.adsRemoved = false,
     this.onOpenAdsRemoval,
   });
 
-  final List<VoiceJob> completedJobs;
+  final VoiceJob initialJob;
+
+  /// 전체 음성(최신순 권장) — 선택 시트에 표시
+  final List<VoiceJob> allJobs;
   final List<VoiceFolder> folders;
 
-  /// 광고 제거 구매 여부 (듣기 구간 광고 안내 숨김)
   final bool adsRemoved;
   final Future<void> Function()? onOpenAdsRemoval;
 
   @override
-  State<ListenHubPage> createState() => _ListenHubPageState();
+  State<VoiceListenPage> createState() => _VoiceListenPageState();
 }
 
-class _ListenHubPageState extends State<ListenHubPage> {
+class _VoiceListenPageState extends State<VoiceListenPage> {
   VoiceJob? _selected;
-
-  @override
-  void didUpdateWidget(ListenHubPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.completedJobs.isEmpty) {
-      _selected = null;
-    } else if (_selected == null ||
-        !widget.completedJobs.any((e) => e.id == _selected!.id)) {
-      _selected = widget.completedJobs.first;
-    }
-  }
 
   @override
   void initState() {
     super.initState();
-    if (widget.completedJobs.isNotEmpty) {
-      _selected = widget.completedJobs.first;
+    final list = widget.allJobs;
+    if (list.isEmpty) return;
+    VoiceJob? match;
+    for (final j in list) {
+      if (j.id == widget.initialJob.id) {
+        match = j;
+        break;
+      }
     }
+    _selected = match ?? list.first;
+  }
+
+  Future<void> _openVoicePicker() async {
+    final list = widget.allJobs;
+    if (list.isEmpty || !mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: YeolpumtaTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final maxH = MediaQuery.sizeOf(ctx).height * 0.72;
+        return SizedBox(
+          height: maxH,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 10),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: YeolpumtaTheme.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        '보유 음성',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: YeolpumtaTheme.textPrimary,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close_rounded),
+                      color: YeolpumtaTheme.textSecondary,
+                      tooltip: '닫기',
+                    ),
+                  ],
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  '재생에 쓸 음성을 골라 주세요.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.35,
+                    color: YeolpumtaTheme.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
+                  itemCount: list.length,
+                  separatorBuilder: (_, _) => const Divider(
+                    height: 1,
+                    indent: 56,
+                  ),
+                  itemBuilder: (context, i) {
+                    final j = list[i];
+                    final sel = _selected?.id == j.id;
+                    final (IconData ic, Color col) = switch (j.status) {
+                      VoiceJobStatus.completed => (
+                          Icons.check_circle_rounded,
+                          const Color(0xFF34C759),
+                        ),
+                      VoiceJobStatus.training => (
+                          Icons.auto_awesome_motion_rounded,
+                          YeolpumtaTheme.accent,
+                        ),
+                      VoiceJobStatus.uploaded => (
+                          Icons.upload_file_rounded,
+                          YeolpumtaTheme.textSecondary,
+                        ),
+                    };
+                    return ListTile(
+                      leading: Icon(ic, color: col, size: 26),
+                      title: Text(
+                        j.fileName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: YeolpumtaTheme.textPrimary,
+                        ),
+                      ),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '${j.status.label} · ${_folderLine(j)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.3,
+                            color: YeolpumtaTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                      trailing: sel
+                          ? const Icon(
+                              Icons.check_rounded,
+                              color: YeolpumtaTheme.accent,
+                            )
+                          : null,
+                      onTap: () {
+                        setState(() => _selected = j);
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   String _folderLine(VoiceJob j) {
@@ -62,48 +196,43 @@ class _ListenHubPageState extends State<ListenHubPage> {
 
   @override
   Widget build(BuildContext context) {
-    final list = widget.completedJobs;
+    final list = widget.allJobs;
 
-    return ColoredBox(
-      color: YeolpumtaTheme.bg,
-      child: SafeArea(
-        child: list.isEmpty
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Text(
-                    '「음성」에서 학습이 완료된 파일이 있어야\n여기서 들을 수 있어요.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 15,
-                      height: 1.5,
-                      color: YeolpumtaTheme.textSecondary,
-                    ),
+    return Scaffold(
+      backgroundColor: YeolpumtaTheme.bg,
+      appBar: AppBar(
+        title: const Text('듣기'),
+      ),
+      body: list.isEmpty
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Text(
+                  '올린 음성이 없어요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.5,
+                    color: YeolpumtaTheme.textSecondary,
                   ),
                 ),
-              )
-            : ListView(
+              ),
+            )
+          : SafeArea(
+              child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
                 children: [
-                  const Text(
-                    '듣기',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                      color: YeolpumtaTheme.textPrimary,
-                      letterSpacing: -0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    '어떤 음성으로 읽을지 고르고, 문장을 적거나 말로 입력해요.',
+                  Text(
+                    '「음성 선택」을 누르면 보유 중인 파일 목록에서 고를 수 있어요.',
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.4,
-                      color: YeolpumtaTheme.textSecondary,
+                      color:
+                          YeolpumtaTheme.textSecondary.withValues(alpha: 0.95),
                     ),
                   ),
-                  if (!widget.adsRemoved && widget.onOpenAdsRemoval != null) ...[
+                  if (!widget.adsRemoved &&
+                      widget.onOpenAdsRemoval != null) ...[
                     const SizedBox(height: 16),
                     Material(
                       color: YeolpumtaTheme.surface,
@@ -180,7 +309,8 @@ class _ListenHubPageState extends State<ListenHubPage> {
                         Icon(
                           Icons.verified_outlined,
                           size: 18,
-                          color: YeolpumtaTheme.accent.withValues(alpha: 0.9),
+                          color:
+                              YeolpumtaTheme.accent.withValues(alpha: 0.9),
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -195,94 +325,139 @@ class _ListenHubPageState extends State<ListenHubPage> {
                     ),
                   ],
                   const SizedBox(height: 20),
-                  Text(
-                    '선택한 음성 파일',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: YeolpumtaTheme.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final j in list)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
-                              label: Text(
-                                j.fileName,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              selected: _selected?.id == j.id,
-                              onSelected: (_) =>
-                                  setState(() => _selected = j),
-                              selectedColor: YeolpumtaTheme.accentSoft,
-                              labelStyle: TextStyle(
-                                color: _selected?.id == j.id
-                                    ? YeolpumtaTheme.accent
-                                    : YeolpumtaTheme.textPrimary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                              side: const BorderSide(
-                                color: YeolpumtaTheme.divider,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
                   if (_selected != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: YeolpumtaTheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: YeolpumtaTheme.divider),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '지금 이 음성으로 재생해요',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: YeolpumtaTheme.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _selected!.fileName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: YeolpumtaTheme.textPrimary,
-                            ),
-                          ),
-                          if (widget.folders.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              _folderLine(_selected!),
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: YeolpumtaTheme.textSecondary,
+                    Material(
+                      color: YeolpumtaTheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: _openVoicePicker,
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _selected!.status ==
+                                                  VoiceJobStatus.completed
+                                              ? '재생 음성'
+                                              : '선택한 음성',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: YeolpumtaTheme.textSecondary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          _selected!.fileName,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: YeolpumtaTheme.textPrimary,
+                                            height: 1.25,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  FilledButton.tonal(
+                                    onPressed: _openVoicePicker,
+                                    style: FilledButton.styleFrom(
+                                      foregroundColor: YeolpumtaTheme.accent,
+                                      backgroundColor:
+                                          YeolpumtaTheme.accentSoft,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text('음성 선택'),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ],
+                              const SizedBox(height: 12),
+                              Text(
+                                '상태 · ${_selected!.status.label}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _selected!.status ==
+                                          VoiceJobStatus.completed
+                                      ? const Color(0xFF34C759)
+                                      : YeolpumtaTheme.textSecondary,
+                                ),
+                              ),
+                              if (widget.folders.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  _folderLine(_selected!),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: YeolpumtaTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
                   const SizedBox(height: 20),
-                  if (_selected != null)
-                    _ListenComposer(voiceLabel: _selected!.fileName),
+                  if (_selected != null &&
+                      _selected!.status == VoiceJobStatus.completed)
+                    _ListenComposer(voiceLabel: _selected!.fileName)
+                  else if (_selected != null)
+                    _ListenNotReadyHint(status: _selected!.status),
                 ],
               ),
+            ),
+    );
+  }
+}
+
+class _ListenNotReadyHint extends StatelessWidget {
+  const _ListenNotReadyHint({required this.status});
+
+  final VoiceJobStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final msg = switch (status) {
+      VoiceJobStatus.uploaded =>
+        '이 파일은 아직 학습 전이에요. 음성 탭에서 「다음 단계(데모)」를 눌러 학습을 진행한 뒤 여기서 들을 수 있어요.',
+      VoiceJobStatus.training =>
+        '학습이 끝나면 이 화면에서 문장 듣기를 쓸 수 있어요. 잠시만 기다려 주세요.',
+      VoiceJobStatus.completed => '',
+    };
+    if (msg.isEmpty) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: YeolpumtaTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: YeolpumtaTheme.divider),
+      ),
+      child: Text(
+        msg,
+        style: TextStyle(
+          fontSize: 14,
+          height: 1.45,
+          color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.95),
+        ),
       ),
     );
   }
@@ -470,7 +645,10 @@ class _ListenComposerState extends State<_ListenComposer> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: YeolpumtaTheme.accent, width: 1.5),
+              borderSide: const BorderSide(
+                color: YeolpumtaTheme.accent,
+                width: 1.5,
+              ),
             ),
             suffixIcon: IconButton(
               tooltip: _listening ? '말 입력 끝' : '말로 입력',

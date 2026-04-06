@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../auth/data/user_profile_repository.dart';
 import '../../../auth/presentation/pages/login_page.dart';
-import '../../../listen/presentation/pages/listen_hub_page.dart';
+import '../../../auth/presentation/pages/my_page.dart';
 import '../../../marketplace/presentation/pages/market_hub_page.dart';
 import '../../../monetization/data/premium_repository.dart';
 import '../../../monetization/presentation/pages/ads_removal_paywall_page.dart';
@@ -9,12 +10,13 @@ import '../../../rooms/presentation/pages/room_hub_page.dart';
 import '../../../shared/presentation/pages/placeholder_page.dart';
 import '../../../voices/data/voice_library_repository.dart';
 import '../../../voices/domain/voice_job.dart';
+import '../../../voices/presentation/pages/voice_listen_page.dart';
 import '../../../voices/presentation/pages/voice_pipeline_page.dart';
 import '../../../voices/presentation/widgets/voice_folder_manage_sheet.dart';
 import '../../../voices/presentation/widgets/voice_upload_sheet.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 
-/// 핵심만: 음성 · 듣기 · 함께 · 마켓
+/// 핵심만: 음성 · 함께 · 마켓 (듣기는 음성 카드에서)
 class YeolpumtaMainShell extends StatefulWidget {
   const YeolpumtaMainShell({super.key});
 
@@ -25,6 +27,7 @@ class YeolpumtaMainShell extends StatefulWidget {
 class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
   final GlobalKey<ScaffoldState> _shellKey = GlobalKey<ScaffoldState>();
   final VoiceLibraryRepository _repo = VoiceLibraryRepository();
+  final UserProfileRepository _profileRepo = UserProfileRepository();
   final PremiumRepository _premiumRepo = PremiumRepository();
   VoiceLibrarySnapshot _data =
       const VoiceLibrarySnapshot(folders: [], jobs: []);
@@ -140,6 +143,22 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     setState(() => _data = snap);
   }
 
+  void _openListen(VoiceJob job) {
+    final sorted = List<VoiceJob>.from(_data.jobs)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => VoiceListenPage(
+          initialJob: job,
+          allJobs: sorted,
+          folders: _data.folders,
+          adsRemoved: _adsRemoved,
+          onOpenAdsRemoval: _openAdsRemovalFromListen,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openAdsRemovalFromListen() async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
@@ -159,9 +178,20 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
   void _goMyPage() {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => const PlaceholderPage(
-          title: '마이페이지',
-          message: '프로필·닉네임·계정 관리 (UI 데모)',
+        builder: (_) => MyPage(
+          repository: _repo,
+          profileRepository: _profileRepo,
+          folders: _data.folders,
+          onAdvanceDemo: _advanceDemo,
+          onDeleteJob: _deleteJob,
+          onMoveJob: _moveJob,
+          onListenTap: _openListen,
+          onAccountDeleted: () {
+            Navigator.of(context).pushAndRemoveUntil<void>(
+              MaterialPageRoute<void>(builder: (_) => const LoginPage()),
+              (_) => false,
+            );
+          },
         ),
       ),
     );
@@ -187,7 +217,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
 
   @override
   Widget build(BuildContext context) {
-    const titles = ['음성', '듣기', '함께', '마켓'];
+    const titles = ['음성', '함께', '마켓'];
 
     if (!_ready) {
       return const Scaffold(
@@ -341,10 +371,10 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
           tooltip: '메뉴',
           onPressed: () => _shellKey.currentState?.openDrawer(),
         ),
-        title: Text(titles[_index]),
+        title: Text(titles[_index.clamp(0, titles.length - 1)]),
       ),
       body: IndexedStack(
-        index: _index,
+        index: _index.clamp(0, 2),
         children: [
           VoicePipelinePage(
             jobs: _data.jobs,
@@ -354,12 +384,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
             onAdvanceDemo: _advanceDemo,
             onDeleteJob: _deleteJob,
             onMoveJob: _moveJob,
-          ),
-          ListenHubPage(
-            completedJobs: _completed,
-            folders: _data.folders,
-            adsRemoved: _adsRemoved,
-            onOpenAdsRemoval: _openAdsRemovalFromListen,
+            onListenTap: _openListen,
           ),
           const RoomHubPage(embeddedInMainShell: true),
           MarketHubPage(
@@ -369,9 +394,9 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
+        selectedIndex: _index.clamp(0, 2),
         onDestinationSelected: (i) async {
-          setState(() => _index = i);
+          setState(() => _index = i.clamp(0, 2));
           final v = await _premiumRepo.isAdsRemoved();
           if (mounted) setState(() => _adsRemoved = v);
         },
@@ -380,11 +405,6 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
             icon: Icon(Icons.audio_file_outlined),
             selectedIcon: Icon(Icons.audio_file_rounded),
             label: '음성',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.headphones_outlined),
-            selectedIcon: Icon(Icons.headphones_rounded),
-            label: '듣기',
           ),
           NavigationDestination(
             icon: Icon(Icons.group_outlined),

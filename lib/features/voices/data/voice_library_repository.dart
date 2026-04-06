@@ -74,6 +74,7 @@ class VoiceLibrarySnapshot {
         'status': j.status.name,
         'createdAt': j.createdAt.toIso8601String(),
         'folderId': j.folderId,
+        'origin': j.origin.name,
       };
 
   static VoiceJob _jobFromJson(Map<String, dynamic> m) {
@@ -82,6 +83,11 @@ class VoiceLibrarySnapshot {
       (e) => e.name == statusName,
       orElse: () => VoiceJobStatus.uploaded,
     );
+    final originName = m['origin'] as String? ?? VoiceOrigin.uploaded.name;
+    final origin = VoiceOrigin.values.firstWhere(
+      (e) => e.name == originName,
+      orElse: () => VoiceOrigin.uploaded,
+    );
     return VoiceJob(
       id: m['id'] as String,
       fileName: m['fileName'] as String,
@@ -89,6 +95,7 @@ class VoiceLibrarySnapshot {
       createdAt: DateTime.tryParse(m['createdAt'] as String? ?? '') ??
           DateTime.now(),
       folderId: m['folderId'] as String? ?? VoiceFolder.uncategorizedId,
+      origin: origin,
     );
   }
 }

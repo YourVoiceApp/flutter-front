@@ -1,5 +1,41 @@
 import 'voice_folder.dart';
 
+/// 음성이 라이브러리에 들어온 경로 (표시·필터용)
+enum VoiceOrigin {
+  /// 직접 업로드·학습 파이프라인
+  uploaded,
+
+  /// 함께(공유방)에서 받음
+  sharedRoom,
+
+  /// 마켓 등에서 구매
+  purchased,
+}
+
+extension VoiceOriginX on VoiceOrigin {
+  String get label {
+    switch (this) {
+      case VoiceOrigin.uploaded:
+        return '내 업로드';
+      case VoiceOrigin.sharedRoom:
+        return '공유방';
+      case VoiceOrigin.purchased:
+        return '구매';
+    }
+  }
+
+  String get shortLabel {
+    switch (this) {
+      case VoiceOrigin.uploaded:
+        return '업로드';
+      case VoiceOrigin.sharedRoom:
+        return '공유';
+      case VoiceOrigin.purchased:
+        return '구매';
+    }
+  }
+}
+
 /// UI 데모용 — 음성 파일 하나의 학습 파이프라인
 enum VoiceJobStatus {
   uploaded,
@@ -27,6 +63,7 @@ class VoiceJob {
     required this.status,
     required this.createdAt,
     required this.folderId,
+    this.origin = VoiceOrigin.uploaded,
   });
 
   final String id;
@@ -39,11 +76,15 @@ class VoiceJob {
   /// [VoiceFolder] id
   final String folderId;
 
+  /// 획득 경로 — 마이페이지·목록 배지
+  final VoiceOrigin origin;
+
   VoiceJob copyWith({
     VoiceJobStatus? status,
     DateTime? createdAt,
     String? folderId,
     String? fileName,
+    VoiceOrigin? origin,
   }) {
     return VoiceJob(
       id: id,
@@ -51,6 +92,7 @@ class VoiceJob {
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       folderId: folderId ?? this.folderId,
+      origin: origin ?? this.origin,
     );
   }
 }
@@ -63,6 +105,7 @@ List<VoiceJob> seedVoiceJobs() => [
         status: VoiceJobStatus.completed,
         createdAt: DateTime(2026, 4, 1, 10, 30),
         folderId: VoiceFolder.uncategorizedId,
+        origin: VoiceOrigin.uploaded,
       ),
       VoiceJob(
         id: '2',
@@ -70,6 +113,7 @@ List<VoiceJob> seedVoiceJobs() => [
         status: VoiceJobStatus.training,
         createdAt: DateTime(2026, 4, 5, 9, 0),
         folderId: 'folder-animal',
+        origin: VoiceOrigin.sharedRoom,
       ),
       VoiceJob(
         id: '3',
@@ -77,6 +121,7 @@ List<VoiceJob> seedVoiceJobs() => [
         status: VoiceJobStatus.uploaded,
         createdAt: DateTime(2026, 4, 5, 14, 20),
         folderId: 'folder-friend',
+        origin: VoiceOrigin.purchased,
       ),
     ];
 

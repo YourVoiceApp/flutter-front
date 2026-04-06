@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../domain/voice_folder.dart';
 import '../../domain/voice_job.dart';
+import '../widgets/voice_job_list_card.dart';
 
-/// 폴더(가로 스크롤) → 폴더 안 음성 목록 → 학습 상태
+/// 폴더(가로 스크롤) → 폴더 안 음성 목록
 class VoicePipelinePage extends StatefulWidget {
   const VoicePipelinePage({
     super.key,
@@ -15,6 +16,7 @@ class VoicePipelinePage extends StatefulWidget {
     required this.onAdvanceDemo,
     required this.onDeleteJob,
     required this.onMoveJob,
+    required this.onListenTap,
   });
 
   final List<VoiceJob> jobs;
@@ -28,6 +30,9 @@ class VoicePipelinePage extends StatefulWidget {
   final void Function(String id) onDeleteJob;
   final void Function(String jobId, String folderId) onMoveJob;
 
+  /// 카드 탭 시 듣기 화면으로 (완료 여부는 콜백 안에서 처리)
+  final void Function(VoiceJob job) onListenTap;
+
   @override
   State<VoicePipelinePage> createState() => _VoicePipelinePageState();
 }
@@ -36,8 +41,10 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
   static const String _scopeAll = '__scope_all__';
 
   final _searchController = TextEditingController();
-  VoiceJobListFilter _filter = VoiceJobListFilter.all;
   VoiceJobListSort _sort = VoiceJobListSort.newest;
+
+  /// null이면 출처 전체
+  VoiceOrigin? _originFilter;
 
   /// null: 폴더만 보기(루트) · [_scopeAll]: 전체 목록 · 그 외: 해당 폴더
   String? _scope;
@@ -85,8 +92,17 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
     return list;
   }
 
+  /// 검색·폴더 범위 + 출처 필터
+  List<VoiceJob> _jobsAfterFilters() {
+    var list = _baseFiltered();
+    if (_originFilter != null) {
+      list = list.where((j) => j.origin == _originFilter).toList();
+    }
+    return list;
+  }
+
   List<VoiceJob> _visibleJobs() {
-    var list = _baseFiltered().where((j) => _filter.matches(j)).toList();
+    var list = List<VoiceJob>.from(_jobsAfterFilters());
     switch (_sort) {
       case VoiceJobListSort.newest:
         list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -101,10 +117,10 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
     return list;
   }
 
-  int _countFor(VoiceJobListFilter f) {
+  int _countForOrigin(VoiceOrigin? o) {
     final base = _baseFiltered();
-    if (f == VoiceJobListFilter.all) return base.length;
-    return base.where((j) => f.matches(j)).length;
+    if (o == null) return base.length;
+    return base.where((j) => j.origin == o).length;
   }
 
   String _scopeTitle() {
@@ -166,7 +182,6 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
   @override
   Widget build(BuildContext context) {
     final visible = _visibleJobs();
-    final filters = VoiceJobListFilter.values;
 
     return PopScope(
       canPop: _scope == null,
@@ -291,89 +306,143 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                           isDense: true,
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  for (final f in filters) ...[
-                                    Padding(
-                                      padding:
-                                          const EdgeInsets.only(right: 8),
-                                      child: FilterChip(
-                                        label: Text(
-                                          '${f.label} (${_countFor(f)})',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: _filter == f
-                                                ? FontWeight.w700
-                                                : FontWeight.w500,
-                                            color: _filter == f
-                                                ? YeolpumtaTheme.accent
-                                                : YeolpumtaTheme
-                                                    .textSecondary,
-                                          ),
-                                        ),
-                                        selected: _filter == f,
-                                        onSelected: (_) =>
-                                            setState(() => _filter = f),
-                                        showCheckmark: false,
-                                        backgroundColor:
-                                            YeolpumtaTheme.surface,
-                                        selectedColor:
-                                            YeolpumtaTheme.accentSoft,
-                                        side: const BorderSide(
-                                          color: YeolpumtaTheme.divider,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 2,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: PopupMenuButton<VoiceJobListSort>(
+                          tooltip: '정렬',
+                          initialValue: _sort,
+                          onSelected: (v) => setState(() => _sort = v),
+                          itemBuilder: (context) => VoiceJobListSort.values
+                              .map(
+                                (s) => PopupMenuItem(
+                                  value: s,
+                                  child: Row(
+                                    children: [
+                                      if (_sort == s)
+                                        const Icon(
+                                          Icons.check_rounded,
+                                          size: 18,
+                                          color: YeolpumtaTheme.accent,
+                                        )
+                                      else
+                                        const SizedBox(width: 18),
+                                      const SizedBox(width: 8),
+                                      Text(s.label),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          child: const Padding(
+                            padding: EdgeInsets.only(left: 4),
+                            child: Icon(
+                              Icons.sort_rounded,
+                              color: YeolpumtaTheme.textSecondary,
+                              size: 26,
                             ),
                           ),
-                          PopupMenuButton<VoiceJobListSort>(
-                            tooltip: '정렬',
-                            initialValue: _sort,
-                            onSelected: (v) => setState(() => _sort = v),
-                            itemBuilder: (context) => VoiceJobListSort.values
-                                .map(
-                                  (s) => PopupMenuItem(
-                                    value: s,
-                                    child: Row(
-                                      children: [
-                                        if (_sort == s)
-                                          const Icon(
-                                            Icons.check_rounded,
-                                            size: 18,
-                                            color: YeolpumtaTheme.accent,
-                                          )
-                                        else
-                                          const SizedBox(width: 18),
-                                        const SizedBox(width: 8),
-                                        Text(s.label),
-                                      ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '출처',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: YeolpumtaTheme.textSecondary
+                                .withValues(alpha: 0.88),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                avatar: Icon(
+                                  Icons.filter_list_rounded,
+                                  size: 16,
+                                  color: _originFilter == null
+                                      ? YeolpumtaTheme.accent
+                                      : YeolpumtaTheme.textSecondary,
+                                ),
+                                label: Text(
+                                  '전체 (${_countForOrigin(null)})',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: _originFilter == null
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: _originFilter == null
+                                        ? YeolpumtaTheme.accent
+                                        : YeolpumtaTheme.textSecondary,
+                                  ),
+                                ),
+                                selected: _originFilter == null,
+                                onSelected: (_) =>
+                                    setState(() => _originFilter = null),
+                                showCheckmark: false,
+                                backgroundColor: YeolpumtaTheme.surface,
+                                selectedColor: YeolpumtaTheme.accentSoft,
+                                side: const BorderSide(
+                                  color: YeolpumtaTheme.divider,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                              ),
+                            ),
+                            for (final o in VoiceOrigin.values)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: FilterChip(
+                                  avatar: Icon(
+                                    VoiceOriginStyle.of(o).icon,
+                                    size: 15,
+                                    color: _originFilter == o
+                                        ? VoiceOriginStyle.of(o).accent
+                                        : YeolpumtaTheme.textSecondary,
+                                  ),
+                                  label: Text(
+                                    '${o.label} (${_countForOrigin(o)})',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: _originFilter == o
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: _originFilter == o
+                                          ? VoiceOriginStyle.of(o).accent
+                                          : YeolpumtaTheme.textSecondary,
                                     ),
                                   ),
-                                )
-                                .toList(),
-                            child: const Padding(
-                              padding: EdgeInsets.only(left: 4),
-                              child: Icon(
-                                Icons.sort_rounded,
-                                color: YeolpumtaTheme.textSecondary,
-                                size: 26,
+                                  selected: _originFilter == o,
+                                  onSelected: (_) =>
+                                      setState(() => _originFilter = o),
+                                  showCheckmark: false,
+                                  backgroundColor: YeolpumtaTheme.surface,
+                                  selectedColor:
+                                      VoiceOriginStyle.of(o).tint,
+                                  side: BorderSide(
+                                    color: _originFilter == o
+                                        ? VoiceOriginStyle.of(o).accent
+                                            .withValues(alpha: 0.35)
+                                        : YeolpumtaTheme.divider,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -424,13 +493,14 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (context, i) {
                       final j = visible[i];
-                      return _VoiceJobCard(
+                      return VoiceJobListCard(
                         job: j,
                         folderLabel: _folderName(j.folderId),
                         showFolderLine: _showFolderOnCards,
                         onAdvance: () => widget.onAdvanceDemo(j.id),
                         onDelete: () => widget.onDeleteJob(j.id),
                         onMove: () => _showMoveSheet(j),
+                        onCardTap: () => widget.onListenTap(j),
                       );
                     },
                   ),
@@ -650,183 +720,6 @@ class _FolderListRow extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _VoiceJobCard extends StatelessWidget {
-  const _VoiceJobCard({
-    required this.job,
-    required this.folderLabel,
-    required this.showFolderLine,
-    required this.onAdvance,
-    required this.onDelete,
-    required this.onMove,
-  });
-
-  final VoiceJob job;
-  final String folderLabel;
-  final bool showFolderLine;
-  final VoidCallback onAdvance;
-  final VoidCallback onDelete;
-  final VoidCallback onMove;
-
-  @override
-  Widget build(BuildContext context) {
-    final status = job.status;
-    final (IconData icon, Color color) = switch (status) {
-      VoiceJobStatus.uploaded => (
-          Icons.cloud_upload_outlined,
-          const Color(0xFF8E8E93),
-        ),
-      VoiceJobStatus.training => (
-          Icons.auto_awesome_motion_rounded,
-          YeolpumtaTheme.accent,
-        ),
-      VoiceJobStatus.completed => (
-          Icons.check_circle_rounded,
-          const Color(0xFF34C759),
-        ),
-    };
-
-    return Material(
-      color: YeolpumtaTheme.surface,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () {},
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(icon, color: color, size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          job.fileName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: YeolpumtaTheme.textPrimary,
-                          ),
-                        ),
-                        if (showFolderLine) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            '폴더 · $folderLabel',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: YeolpumtaTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            _StatusPill(status: status),
-                            if (status != VoiceJobStatus.completed) ...[
-                              const SizedBox(width: 8),
-                              TextButton(
-                                onPressed: onAdvance,
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: Size.zero,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  foregroundColor: YeolpumtaTheme.accent,
-                                ),
-                                child: const Text(
-                                  '다음 단계(데모)',
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(
-                      Icons.more_horiz_rounded,
-                      color: YeolpumtaTheme.textSecondary,
-                    ),
-                    onSelected: (v) {
-                      if (v == 'move') onMove();
-                      if (v == 'delete') onDelete();
-                    },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: 'move',
-                        child: Text('다른 폴더로'),
-                      ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Text(
-                          '삭제',
-                          style: TextStyle(color: Colors.redAccent),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              if (status == VoiceJobStatus.training) ...[
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: 0.62,
-                    minHeight: 4,
-                    backgroundColor: YeolpumtaTheme.divider,
-                    color: YeolpumtaTheme.accent,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '학습 진행 중… (UI만 표시)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: YeolpumtaTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.status});
-
-  final VoiceJobStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: YeolpumtaTheme.bg,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        status.label,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: YeolpumtaTheme.textSecondary,
         ),
       ),
     );

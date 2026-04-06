@@ -4,6 +4,8 @@ import '../../../shared/presentation/pages/placeholder_page.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
 import '../../../shell/presentation/pages/main_shell_page.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
+import '../../data/user_profile_repository.dart';
+import 'forgot_password_page.dart';
 import 'sign_up_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -16,7 +18,9 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _profileRepo = UserProfileRepository();
   bool _obscurePassword = true;
+  bool _loggingIn = false;
 
   @override
   void dispose() {
@@ -33,8 +37,26 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _submitLogin() {
+  Future<void> _submitLogin() async {
     FocusScope.of(context).unfocus();
+    setState(() => _loggingIn = true);
+    final profile = await _profileRepo.loadProfile();
+    if (profile != null) {
+      final ok = await _profileRepo.verifyLogin(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (!mounted) return;
+      setState(() => _loggingIn = false);
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이메일 또는 비밀번호가 올바르지 않아요.')),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
+    setState(() => _loggingIn = false);
     Navigator.of(context).pushReplacement<void, void>(
       MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
     );
@@ -200,11 +222,35 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () async {
+                        FocusScope.of(context).unfocus();
+                        final ok = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute<bool>(
+                            builder: (_) => const ForgotPasswordPage(),
+                          ),
+                        );
+                        if (!context.mounted) return;
+                        if (ok == true) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                '비밀번호를 재설정했어요. 새 비밀번호로 로그인해 주세요.',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('비밀번호 찾기'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: _submitLogin,
+                      onPressed: _loggingIn ? null : _submitLogin,
                       style: FilledButton.styleFrom(
                         backgroundColor: YeolpumtaTheme.accent,
                         foregroundColor: Colors.white,
@@ -214,13 +260,22 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         elevation: 0,
                       ),
-                      child: const Text(
-                        '로그인',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: _loggingIn
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              '로그인',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 12),

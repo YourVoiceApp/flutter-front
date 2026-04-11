@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../app/config/auth_config.dart';
@@ -23,9 +24,19 @@ class GoogleBackendAuth {
 
   static Future<void>? _googleInit;
 
+  static String? _platformClientId() {
+    if (kIsWeb) return null;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.iOS => AuthConfig.googleIosClientId,
+      TargetPlatform.macOS => AuthConfig.googleIosClientId,
+      _ => null,
+    };
+  }
+
   static Future<void> _ensureGoogleSignInInitialized() async {
     try {
       _googleInit ??= GoogleSignIn.instance.initialize(
+        clientId: _platformClientId(),
         serverClientId: AuthConfig.googleServerClientId.isEmpty
             ? null
             : AuthConfig.googleServerClientId,

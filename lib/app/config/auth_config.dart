@@ -26,4 +26,16 @@ abstract final class AuthConfig {
     defaultValue:
         '498950596222-ipue9oeqdnsug7jt8rl0i77v5shrj06p.apps.googleusercontent.com',
   );
+
+  static const googleIosClientId = String.fromEnvironment(
+    'GOOGLE_IOS_CLIENT_ID',
+    defaultValue:
+        '498950596222-p466hd9uk790neei25bm7jqsbuhkh8r2.apps.googleusercontent.com',
+  );
+
+  static const googleIosReversedClientId = String.fromEnvironment(
+    'GOOGLE_IOS_REVERSED_CLIENT_ID',
+    defaultValue:
+        'com.googleusercontent.apps.498950596222-p466hd9uk790neei25bm7jqsbuhkh8r2',
+  );
 }

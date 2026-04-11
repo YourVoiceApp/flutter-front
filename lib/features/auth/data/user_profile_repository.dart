@@ -42,6 +42,26 @@ class UserProfileRepository {
       'statusMessage': profile.statusMessage,
       'createdAt': profile.createdAt.toIso8601String(),
       'password': password,
+      'oauthProvider': 'password',
+    });
+  }
+
+  /// After Google Sign-In + backend exchange; keeps local demo profile in sync.
+  Future<void> saveGoogleSignInProfile({
+    required String email,
+    required String nickname,
+  }) async {
+    final existing = await _readRaw();
+    final created = existing?['createdAt'] as String? ??
+        DateTime.now().toIso8601String();
+    final status = existing?['statusMessage'] as String? ?? '';
+    await _writeRaw({
+      'email': email,
+      'nickname': nickname,
+      'statusMessage': status,
+      'createdAt': created,
+      'password': '__google_oauth__',
+      'oauthProvider': 'google',
     });
   }
 

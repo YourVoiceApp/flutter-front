@@ -12,6 +12,14 @@ class YeolpumtaTheme {
   static const Color accentSoft = Color(0xFFE8E7FA);
   static const Color divider = Color(0xFFE5E5EA);
 
+  /// System fonts for Hangul when Roboto has no glyphs (typical on Windows).
+  static const List<String> _koreanFallbackFonts = [
+    'Malgun Gothic',
+    'Apple SD Gothic Neo',
+    'Noto Sans CJK KR',
+    'Noto Sans KR',
+  ];
+
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
       seedColor: accent,
@@ -23,6 +31,7 @@ class YeolpumtaTheme {
       scaffoldBackgroundColor: bg,
       colorScheme: scheme,
       fontFamily: 'Roboto',
+      fontFamilyFallback: _koreanFallbackFonts,
       appBarTheme: const AppBarTheme(
         backgroundColor: bg,
         foregroundColor: textPrimary,

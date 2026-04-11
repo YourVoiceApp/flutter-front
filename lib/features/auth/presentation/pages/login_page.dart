@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../shared/presentation/pages/placeholder_page.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
 import '../../../shell/presentation/pages/main_shell_page.dart';
+import '../../../../app/app.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
+import '../../data/auth_api_client.dart';
+import '../../data/google_auth_flow_exception.dart';
+import '../../data/google_backend_auth.dart';
 import '../../data/user_profile_repository.dart';
 import 'forgot_password_page.dart';
 import 'sign_up_page.dart';
@@ -19,8 +25,10 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _profileRepo = UserProfileRepository();
+  final _googleBackendAuth = GoogleBackendAuth();
   bool _obscurePassword = true;
   bool _loggingIn = false;
+  bool _googleSigningIn = false;
 
   @override
   void dispose() {
@@ -70,6 +78,151 @@ class _LoginPageState extends State<LoginPage> {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  Future<void> _showAuthErrorDialog({
+    required String title,
+    required String body,
+  }) async {
+    Future<void> open(BuildContext dialogContext) async {
+      await showDialog<void>(
+        context: dialogContext,
+        useRootNavigator: true,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(child: Text(body)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final root = VoiceStudioApp.navigatorKey.currentContext;
+    if (root != null && root.mounted) {
+      await open(root);
+      return;
+    }
+    if (context.mounted) {
+      await open(context);
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final c = VoiceStudioApp.navigatorKey.currentContext;
+      if (c != null && c.mounted) {
+        open(c);
+      }
+    });
+  }
+
+  Future<void> _showGoogleAuthDiagnostic(GoogleAuthFlowException e) async {
+    var detail = e.detail;
+    if (e.stage == GoogleAuthFailureStage.backend &&
+        detail.contains('localhost')) {
+      detail =
+          '$detail\n\nTip: Android emulator cannot use localhost for your PC. '
+          'Set AUTH_API_BASE to http://10.0.2.2:YOUR_PORT';
+    }
+    final stageLabel = switch (e.stage) {
+      GoogleAuthFailureStage.google => 'Stage: Google (account / idToken)',
+      GoogleAuthFailureStage.backend => 'Stage: Backend API',
+      GoogleAuthFailureStage.local => 'Stage: Save on device',
+    };
+    final headline = switch (e.stage) {
+      GoogleAuthFailureStage.google =>
+        'Problem at Google sign-in step',
+      GoogleAuthFailureStage.backend =>
+        'Problem calling your server (network / URL / HTTP error)',
+      GoogleAuthFailureStage.local =>
+        'Problem saving login on this device',
+    };
+    await _showAuthErrorDialog(
+      title: headline,
+      body: '[$stageLabel]\n${e.title}\n\n$detail',
+    );
+  }
+
+  Future<void> _signInWithGoogle() async {
+    FocusScope.of(context).unfocus();
+    setState(() => _googleSigningIn = true);
+    try {
+      await _googleBackendAuth.signInExchangeAndPersist();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
+      );
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        await _showAuthErrorDialog(
+          title: 'Google sign-in did not finish',
+          body:
+              'You may have closed the screen, or Google stopped the flow.\n\n'
+              'If you saw a message like a linked account (e.g. Kakao), '
+              'Google may treat that as cancel - try another Google account '
+              "or complete the steps on Google's screen.\n\n"
+              'Code: canceled\n'
+              '${e.description ?? ''}',
+        );
+        return;
+      }
+      if (e.code == GoogleSignInExceptionCode.interrupted) {
+        await _showAuthErrorDialog(
+          title: 'Google sign-in was interrupted',
+          body:
+              'Common causes after picking an account:\n\n'
+              '• Wrong API URL on emulator: use http://10.0.2.2:9090 '
+              'instead of http://localhost:9090\n'
+              '• Server not running or blocked port / firewall\n'
+              '• Android OAuth client: package name + debug SHA-1 must match\n\n'
+              'Code: interrupted\n'
+              '${e.description ?? e.toString()}',
+        );
+        return;
+      }
+      await _showAuthErrorDialog(
+        title: 'Google sign-in failed',
+        body: e.description?.isNotEmpty == true
+            ? e.description!
+            : e.toString(),
+      );
+    } on GoogleAuthFlowException catch (e) {
+      await _showGoogleAuthDiagnostic(e);
+    } on AuthApiException catch (e) {
+      await _showAuthErrorDialog(
+        title: e.isNetworkError
+            ? 'Cannot reach backend server'
+            : 'Backend returned an error',
+        body:
+            '${e.isNetworkError ? "Network / address / timeout. " : ""}'
+            '${e.message}',
+      );
+    } on PlatformException catch (e) {
+      await _showAuthErrorDialog(
+        title: 'Google sign-in (platform)',
+        body: '${e.message ?? e.code}\n${e.details ?? ''}',
+      );
+    } on UnsupportedError catch (e) {
+      await _showAuthErrorDialog(
+        title: 'Not supported here',
+        body: e.message ??
+            'Google sign-in is not available on this platform.',
+      );
+    } on StateError catch (e) {
+      await _showAuthErrorDialog(
+        title: 'Error',
+        body: e.message,
+      );
+    } catch (e) {
+      await _showAuthErrorDialog(
+        title: 'Unexpected error',
+        body: '$e',
+      );
+    } finally {
+      if (mounted) setState(() => _googleSigningIn = false);
+    }
   }
 
   @override
@@ -335,7 +488,8 @@ class _LoginPageState extends State<LoginPage> {
               foregroundColor: const Color(0xFF1F1F1F),
               borderColor: const Color(0xFFDADCE0),
               leading: _SocialMark.google(),
-              onPressed: () => _socialComingSoon('Google'),
+              isLoading: _googleSigningIn,
+              onPressed: _signInWithGoogle,
             ),
             const SizedBox(height: 10),
             _SocialLoginButton(
@@ -371,6 +525,7 @@ class _SocialLoginButton extends StatelessWidget {
     required this.borderColor,
     required this.leading,
     required this.onPressed,
+    this.isLoading = false,
   });
 
   final String label;
@@ -379,13 +534,14 @@ class _SocialLoginButton extends StatelessWidget {
   final Color borderColor;
   final Widget leading;
   final VoidCallback onPressed;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onPressed,
+        onTap: isLoading ? null : onPressed,
         borderRadius: BorderRadius.circular(12),
         child: Ink(
           height: 52,
@@ -410,7 +566,16 @@ class _SocialLoginButton extends StatelessWidget {
               children: [
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: leading,
+                  child: isLoading
+                      ? SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: foregroundColor.withValues(alpha: 0.85),
+                          ),
+                        )
+                      : leading,
                 ),
                 Text(
                   label,
@@ -419,7 +584,9 @@ class _SocialLoginButton extends StatelessWidget {
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.2,
-                    color: foregroundColor,
+                    color: foregroundColor.withValues(
+                      alpha: isLoading ? 0.45 : 1,
+                    ),
                   ),
                 ),
               ],

@@ -108,7 +108,7 @@ class GoogleBackendAuth {
       );
     }
 
-    final GoogleIdTokenExchangeResult result;
+    final AuthExchangeResult result;
     try {
       result = await _api.exchangeGoogleIdToken(
         idToken,
@@ -163,11 +163,12 @@ class GoogleBackendAuth {
 
     final nickname = account.displayName?.trim();
     try {
-      await _profiles.saveGoogleSignInProfile(
+      await _profiles.saveSocialSignInProfile(
         email: email,
         nickname: (nickname != null && nickname.isNotEmpty)
             ? nickname
             : email.split('@').first,
+        provider: 'google',
       );
     } catch (e, _) {
       throw GoogleAuthFlowException(

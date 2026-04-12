@@ -46,10 +46,11 @@ class UserProfileRepository {
     });
   }
 
-  /// After Google Sign-In + backend exchange; keeps local demo profile in sync.
-  Future<void> saveGoogleSignInProfile({
+  /// After a social sign-in + backend exchange; keeps local demo profile in sync.
+  Future<void> saveSocialSignInProfile({
     required String email,
     required String nickname,
+    required String provider,
   }) async {
     final existing = await _readRaw();
     final created = existing?['createdAt'] as String? ??
@@ -60,8 +61,8 @@ class UserProfileRepository {
       'nickname': nickname,
       'statusMessage': status,
       'createdAt': created,
-      'password': '__google_oauth__',
-      'oauthProvider': 'google',
+      'password': '__social_oauth__',
+      'oauthProvider': provider,
     });
   }
 

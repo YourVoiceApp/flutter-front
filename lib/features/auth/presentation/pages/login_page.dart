@@ -10,6 +10,7 @@ import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../data/auth_api_client.dart';
 import '../../data/google_auth_flow_exception.dart';
 import '../../data/google_backend_auth.dart';
+import '../../data/kakao_backend_auth.dart';
 import '../../data/user_profile_repository.dart';
 import 'forgot_password_page.dart';
 import 'sign_up_page.dart';
@@ -26,9 +27,11 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   final _profileRepo = UserProfileRepository();
   final _googleBackendAuth = GoogleBackendAuth();
+  final _kakaoBackendAuth = KakaoBackendAuth();
   bool _obscurePassword = true;
   bool _loggingIn = false;
   bool _googleSigningIn = false;
+  bool _kakaoSigningIn = false;
 
   @override
   void dispose() {
@@ -222,6 +225,53 @@ class _LoginPageState extends State<LoginPage> {
       );
     } finally {
       if (mounted) setState(() => _googleSigningIn = false);
+    }
+  }
+
+  Future<void> _signInWithKakao() async {
+    FocusScope.of(context).unfocus();
+    setState(() => _kakaoSigningIn = true);
+    try {
+      await _kakaoBackendAuth.signInExchangeAndPersist();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
+      );
+    } on AuthApiException catch (e) {
+      await _showAuthErrorDialog(
+        title: e.isNetworkError
+            ? 'Cannot reach backend server'
+            : 'Backend returned an error',
+        body:
+            '${e.isNetworkError ? "Network / address / timeout. " : ""}'
+            '${e.message}',
+      );
+    } on PlatformException catch (e) {
+      final title = e.code == 'CANCELED'
+          ? 'Kakao sign-in canceled'
+          : 'Kakao sign-in failed';
+      await _showAuthErrorDialog(
+        title: title,
+        body: '${e.message ?? e.code}\n${e.details ?? ''}',
+      );
+    } on UnsupportedError catch (e) {
+      await _showAuthErrorDialog(
+        title: 'Not supported here',
+        body: e.message ??
+            'Kakao sign-in is not available on this platform.',
+      );
+    } on StateError catch (e) {
+      await _showAuthErrorDialog(
+        title: 'Kakao configuration or response error',
+        body: e.message,
+      );
+    } catch (e) {
+      await _showAuthErrorDialog(
+        title: 'Unexpected Kakao login error',
+        body: '$e',
+      );
+    } finally {
+      if (mounted) setState(() => _kakaoSigningIn = false);
     }
   }
 
@@ -498,7 +548,8 @@ class _LoginPageState extends State<LoginPage> {
               foregroundColor: const Color(0xFF191919),
               borderColor: const Color(0xFFFEE500),
               leading: _SocialMark.kakao(),
-              onPressed: () => _socialComingSoon('카카오'),
+              isLoading: _kakaoSigningIn,
+              onPressed: _signInWithKakao,
             ),
             const SizedBox(height: 10),
             _SocialLoginButton(

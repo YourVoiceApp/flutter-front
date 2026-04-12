@@ -48,6 +48,8 @@ class AuthApiClient {
     String? baseUrl,
     String? signUpPath,
     String? loginPath,
+    String? emailSendVerificationPath,
+    String? emailVerifyPath,
     String? googleAuthPath,
     String? kakaoAuthPath,
     String? refreshPath,
@@ -61,6 +63,9 @@ class AuthApiClient {
   })  : _baseUrl = baseUrl ?? AuthConfig.apiBaseUrl,
         _signUpPath = signUpPath ?? '/auth/signup',
         _loginPath = loginPath ?? '/auth/login',
+        _emailSendVerificationPath =
+            emailSendVerificationPath ?? '/auth/email/send-verification',
+        _emailVerifyPath = emailVerifyPath ?? '/auth/email/verify',
         _googlePath = googleAuthPath ?? AuthConfig.googleAuthPath,
         _kakaoPath = kakaoAuthPath ?? AuthConfig.kakaoAuthPath,
         _refreshPath = refreshPath ?? '/auth/refresh',
@@ -75,6 +80,8 @@ class AuthApiClient {
   final String _baseUrl;
   final String _signUpPath;
   final String _loginPath;
+  final String _emailSendVerificationPath;
+  final String _emailVerifyPath;
   final String _googlePath;
   final String _kakaoPath;
   final String _refreshPath;
@@ -101,6 +108,10 @@ class AuthApiClient {
   Uri _signUpUri() => _socialUri(_signUpPath);
 
   Uri _loginUri() => _socialUri(_loginPath);
+
+  Uri _emailSendVerificationUri() => _socialUri(_emailSendVerificationPath);
+
+  Uri _emailVerifyUri() => _socialUri(_emailVerifyPath);
 
   Uri _refreshUri() => _socialUri(_refreshPath);
 
@@ -145,6 +156,32 @@ class AuthApiClient {
         'password': password,
         'deviceInfo': deviceInfo,
       },
+    );
+  }
+
+  Future<void> sendEmailVerification({
+    required String email,
+  }) async {
+    await _sendNoContent(
+      'POST',
+      _emailSendVerificationUri(),
+      body: <String, String>{'email': email},
+      successCodes: const {204},
+    );
+  }
+
+  Future<void> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    await _sendNoContent(
+      'POST',
+      _emailVerifyUri(),
+      body: <String, String>{
+        'email': email,
+        'code': code,
+      },
+      successCodes: const {204},
     );
   }
 

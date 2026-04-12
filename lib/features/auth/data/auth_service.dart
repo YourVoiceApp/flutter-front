@@ -38,6 +38,22 @@ class AuthService {
     );
   }
 
+  Future<void> sendEmailVerification({
+    required String email,
+  }) {
+    return _api.sendEmailVerification(email: email);
+  }
+
+  Future<void> verifyEmailCode({
+    required String email,
+    required String code,
+  }) {
+    return _api.verifyEmailCode(
+      email: email,
+      code: code,
+    );
+  }
+
   Future<AuthUser> signInWithEmail({
     required String email,
     required String password,

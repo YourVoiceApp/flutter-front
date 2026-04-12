@@ -7,7 +7,6 @@ import '../../data/auth_service.dart';
 import '../../../shell/presentation/pages/main_shell_page.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 
-/// 이메일·닉네임·비밀번호·이메일 인증 UI (백엔드 연동 전 데모)
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
@@ -27,6 +26,8 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _obscurePasswordAgain = true;
   bool _codeSent = false;
   bool _emailVerified = false;
+  bool _sendingCode = false;
+  bool _verifyingCode = false;
   bool _submitting = false;
 
   @override
@@ -44,7 +45,7 @@ class _SignUpPageState extends State<SignUpPage> {
     return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t);
   }
 
-  void _sendVerificationCode() {
+  Future<void> _sendVerificationCode() async {
     FocusScope.of(context).unfocus();
     final email = _emailCtrl.text.trim();
     if (!_looksLikeEmail(email)) {
@@ -53,34 +54,68 @@ class _SignUpPageState extends State<SignUpPage> {
       );
       return;
     }
-    setState(() {
-      _codeSent = true;
-      _emailVerified = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('데모: 인증번호가 발송됐다고 가정해요. 아래에 6자리를 입력해 주세요.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    setState(() => _sendingCode = true);
+    try {
+      await _authService.sendEmailVerification(email: email);
+      if (!mounted) return;
+      setState(() {
+        _codeSent = true;
+        _emailVerified = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('인증 메일을 보냈어요. 메일의 6자리 코드를 입력해 주세요.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on AuthApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _sendingCode = false);
+    }
   }
 
-  void _confirmVerificationCode() {
+  Future<void> _confirmVerificationCode() async {
     FocusScope.of(context).unfocus();
+    final email = _emailCtrl.text.trim();
     final code = _codeCtrl.text.trim();
+    if (!_looksLikeEmail(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이메일을 확인해 주세요.')),
+      );
+      return;
+    }
     if (code.length != 6 || int.tryParse(code) == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('인증번호 6자리(숫자)를 입력해 주세요.')),
       );
       return;
     }
-    setState(() => _emailVerified = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('이메일 인증을 완료했어요. (데모)'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    setState(() => _verifyingCode = true);
+    try {
+      await _authService.verifyEmailCode(
+        email: email,
+        code: code,
+      );
+      if (!mounted) return;
+      setState(() => _emailVerified = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('이메일 인증을 완료했어요.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on AuthApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _verifyingCode = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -267,7 +302,9 @@ class _SignUpPageState extends State<SignUpPage> {
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: OutlinedButton(
-                          onPressed: _emailVerified ? null : _sendVerificationCode,
+                          onPressed: (_emailVerified || _sendingCode || _submitting)
+                              ? null
+                              : _sendVerificationCode,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: YeolpumtaTheme.accent,
                             side: const BorderSide(color: YeolpumtaTheme.accent),
@@ -279,15 +316,21 @@ class _SignUpPageState extends State<SignUpPage> {
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          child: const Text(
-                            '인증번호\n받기',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              height: 1.2,
-                            ),
-                          ),
+                          child: _sendingCode
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Text(
+                                  '인증번호\n받기',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.2,
+                                  ),
+                                ),
                         ),
                       ),
                     ],
@@ -297,8 +340,16 @@ class _SignUpPageState extends State<SignUpPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: _codeSent ? _confirmVerificationCode : null,
-                        child: const Text('인증 확인'),
+                        onPressed: (_codeSent && !_verifyingCode && !_submitting)
+                            ? _confirmVerificationCode
+                            : null,
+                        child: _verifyingCode
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('인증 확인'),
                       ),
                     ),
                   ],

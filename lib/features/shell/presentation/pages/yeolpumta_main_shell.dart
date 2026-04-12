@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../auth/data/auth_service.dart';
 import '../../../auth/data/user_profile_repository.dart';
+import '../../../auth/domain/user_profile.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/pages/my_page.dart';
 import '../../../marketplace/presentation/pages/market_hub_page.dart';
@@ -26,11 +28,13 @@ class YeolpumtaMainShell extends StatefulWidget {
 
 class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
   final GlobalKey<ScaffoldState> _shellKey = GlobalKey<ScaffoldState>();
+  final AuthService _authService = AuthService();
   final VoiceLibraryRepository _repo = VoiceLibraryRepository();
   final UserProfileRepository _profileRepo = UserProfileRepository();
   final PremiumRepository _premiumRepo = PremiumRepository();
   VoiceLibrarySnapshot _data =
       const VoiceLibrarySnapshot(folders: [], jobs: []);
+  UserProfile? _profile;
   bool _ready = false;
   bool _adsRemoved = false;
 
@@ -45,9 +49,11 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
   Future<void> _bootstrap() async {
     final s = await _repo.load();
     final ads = await _premiumRepo.isAdsRemoved();
+    final profile = await _profileRepo.loadProfile();
     if (!mounted) return;
     setState(() {
       _data = s;
+      _profile = profile;
       _adsRemoved = ads;
       _ready = true;
     });
@@ -170,13 +176,13 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     setState(() => _adsRemoved = v || ok == true);
   }
 
-  void _openFromDrawer(VoidCallback fn) {
+  Future<void> _openFromDrawer(Future<void> Function() fn) async {
     Navigator.of(context).pop();
-    fn();
+    await fn();
   }
 
-  void _goMyPage() {
-    Navigator.of(context).push<void>(
+  Future<void> _goMyPage() async {
+    await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => MyPage(
           repository: _repo,
@@ -195,10 +201,14 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
         ),
       ),
     );
+    if (!mounted) return;
+    final profile = await _profileRepo.loadProfile();
+    if (!mounted) return;
+    setState(() => _profile = profile);
   }
 
-  void _goSettings() {
-    Navigator.of(context).push<void>(
+  Future<void> _goSettings() async {
+    await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => const PlaceholderPage(
           title: '설정',
@@ -208,7 +218,9 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     );
   }
 
-  void _logout() {
+  Future<void> _logout() async {
+    await _authService.logout();
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil<void>(
       MaterialPageRoute<void>(builder: (_) => const LoginPage()),
       (_) => false,
@@ -272,7 +284,9 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '로그인 중 · 데모 계정',
+                      _profile == null
+                          ? '로그인 유지 중'
+                          : '${_profile!.nickname} · ${_profile!.email}',
                       style: TextStyle(
                         fontSize: 13,
                         height: 1.3,
@@ -328,8 +342,8 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
                               YeolpumtaTheme.textSecondary.withValues(alpha: 0.95),
                         ),
                       ),
-                      onTap: () => _openFromDrawer(() {
-                        Navigator.of(context).push<void>(
+                      onTap: () => _openFromDrawer(() async {
+                        await Navigator.of(context).push<void>(
                           MaterialPageRoute<void>(
                             builder: (_) => const PlaceholderPage(
                               title: '고객센터',

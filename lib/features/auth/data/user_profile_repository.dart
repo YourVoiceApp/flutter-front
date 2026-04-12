@@ -6,7 +6,7 @@ import '../domain/user_profile.dart';
 
 const _prefsKey = 'user_profile_account_v1';
 
-/// 프로필 + 데모용 비밀번호 (JSON 내부 필드 — 출시 시 서버/API로 교체)
+/// Local cache for profile data returned from `/me`.
 class UserProfileRepository {
   UserProfileRepository();
 
@@ -31,38 +31,19 @@ class UserProfileRepository {
     await prefs.remove(_prefsKey);
   }
 
-  /// 가입 또는 전체 덮어쓰기
-  Future<void> saveAccount({
-    required UserProfile profile,
-    required String password,
-  }) async {
-    await _writeRaw({
-      'email': profile.email,
-      'nickname': profile.nickname,
-      'statusMessage': profile.statusMessage,
-      'createdAt': profile.createdAt.toIso8601String(),
-      'password': password,
-      'oauthProvider': 'password',
-    });
-  }
-
-  /// After a social sign-in + backend exchange; keeps local demo profile in sync.
-  Future<void> saveSocialSignInProfile({
+  Future<void> saveProfile({
     required String email,
     required String nickname,
-    required String provider,
+    required bool hasPassword,
   }) async {
     final existing = await _readRaw();
-    final created = existing?['createdAt'] as String? ??
-        DateTime.now().toIso8601String();
-    final status = existing?['statusMessage'] as String? ?? '';
     await _writeRaw({
       'email': email,
       'nickname': nickname,
-      'statusMessage': status,
-      'createdAt': created,
-      'password': '__social_oauth__',
-      'oauthProvider': provider,
+      'statusMessage': existing?['statusMessage'] as String? ?? '',
+      'createdAt': existing?['createdAt'] as String? ??
+          DateTime.now().toIso8601String(),
+      'hasPassword': hasPassword,
     });
   }
 
@@ -75,41 +56,17 @@ class UserProfileRepository {
       statusMessage: m['statusMessage'] as String? ?? '',
       createdAt: DateTime.tryParse(m['createdAt'] as String? ?? '') ??
           DateTime.now(),
+      hasPassword: m['hasPassword'] as bool? ?? true,
     );
-  }
-
-  Future<String?> loadPassword() async {
-    final m = await _readRaw();
-    return m?['password'] as String?;
   }
 
   Future<void> updateProfile(UserProfile profile) async {
     final m = await _readRaw();
     if (m == null) return;
+    m['email'] = profile.email;
     m['nickname'] = profile.nickname;
     m['statusMessage'] = profile.statusMessage;
+    m['hasPassword'] = profile.hasPassword;
     await _writeRaw(m);
-  }
-
-  Future<void> updatePassword(String newPassword) async {
-    final m = await _readRaw();
-    if (m == null) return;
-    m['password'] = newPassword;
-    await _writeRaw(m);
-  }
-
-  /// 이메일이 계정과 일치하는지 (비밀번호 찾기용)
-  Future<bool> hasEmail(String email) async {
-    final p = await loadProfile();
-    if (p == null) return false;
-    return p.email.toLowerCase() == email.trim().toLowerCase();
-  }
-
-  Future<bool> verifyLogin(String email, String password) async {
-    final m = await _readRaw();
-    if (m == null) return false;
-    final e = (m['email'] as String?)?.toLowerCase();
-    final pw = m['password'] as String?;
-    return e == email.trim().toLowerCase() && pw == password;
   }
 }

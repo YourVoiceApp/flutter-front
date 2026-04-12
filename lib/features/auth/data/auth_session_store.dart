@@ -1,47 +1,45 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Persists API tokens returned after Google idToken exchange (Spring JWT, etc.).
+/// Persists refresh/access tokens across app restarts.
 class AuthSessionStore {
   static const _accessKey = 'auth_access_token_v1';
   static const _refreshKey = 'auth_refresh_token_v1';
   static const _userIdKey = 'auth_user_id_v1';
+  static const _storage = FlutterSecureStorage();
 
   Future<void> save({
     String? accessToken,
     String? refreshToken,
     int? userId,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
     if (accessToken != null) {
-      await prefs.setString(_accessKey, accessToken);
+      await _storage.write(key: _accessKey, value: accessToken);
     }
     if (refreshToken != null) {
-      await prefs.setString(_refreshKey, refreshToken);
+      await _storage.write(key: _refreshKey, value: refreshToken);
     }
     if (userId != null) {
-      await prefs.setInt(_userIdKey, userId);
+      await _storage.write(key: _userIdKey, value: userId.toString());
     }
   }
 
   Future<void> clear() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_accessKey);
-    await prefs.remove(_refreshKey);
-    await prefs.remove(_userIdKey);
+    await _storage.delete(key: _accessKey);
+    await _storage.delete(key: _refreshKey);
+    await _storage.delete(key: _userIdKey);
   }
 
   Future<String?> readAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_accessKey);
+    return _storage.read(key: _accessKey);
   }
 
   Future<String?> readRefreshToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_refreshKey);
+    return _storage.read(key: _refreshKey);
   }
 
   Future<int?> readUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_userIdKey);
+    final raw = await _storage.read(key: _userIdKey);
+    if (raw == null || raw.isEmpty) return null;
+    return int.tryParse(raw);
   }
 }

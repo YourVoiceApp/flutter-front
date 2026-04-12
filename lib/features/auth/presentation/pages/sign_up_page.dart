@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../shared/presentation/widgets/common_widgets.dart';
+import '../../data/auth_api_client.dart';
+import '../../data/auth_service.dart';
 import '../../../shell/presentation/pages/main_shell_page.dart';
-import '../../data/user_profile_repository.dart';
-import '../../domain/user_profile.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 
 /// 이메일·닉네임·비밀번호·이메일 인증 UI (백엔드 연동 전 데모)
@@ -16,6 +16,7 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
+  final _authService = AuthService();
   final _nicknameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
@@ -119,22 +120,29 @@ class _SignUpPageState extends State<SignUpPage> {
     }
 
     setState(() => _submitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    if (!mounted) return;
-    await UserProfileRepository().saveAccount(
-      profile: UserProfile(
+    try {
+      await _authService.signUpWithEmail(
+        nickName: nick,
         email: _emailCtrl.text.trim(),
-        nickname: nick,
-        statusMessage: '',
-        createdAt: DateTime.now(),
-      ),
-      password: p,
-    );
-    if (!mounted) return;
-    setState(() => _submitting = false);
-    Navigator.of(context).pushReplacement<void, void>(
-      MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
-    );
+        password: p,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
+      );
+    } on AuthApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('회원가입 중 오류가 발생했어요: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'theme/yeolpumta_theme.dart';
-import '../features/auth/presentation/pages/login_page.dart';
+import '../features/auth/presentation/pages/auth_gate_page.dart';
 
 class VoiceStudioApp extends StatelessWidget {
   const VoiceStudioApp({super.key});
@@ -17,7 +17,7 @@ class VoiceStudioApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Your Voice',
       theme: YeolpumtaTheme.light(),
-      home: const LoginPage(),
+      home: const AuthGatePage(),
     );
   }
 }

@@ -72,7 +72,6 @@ class _MyPageState extends State<MyPage> {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => AccountDetailPage(
-          profileRepository: widget.profileRepository,
           onAccountDeleted: widget.onAccountDeleted,
         ),
       ),

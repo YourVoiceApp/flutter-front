@@ -8,11 +8,10 @@ import '../../../shell/presentation/pages/main_shell_page.dart';
 import '../../../../app/app.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../data/auth_api_client.dart';
+import '../../data/auth_service.dart';
 import '../../data/google_auth_flow_exception.dart';
 import '../../data/google_backend_auth.dart';
 import '../../data/kakao_backend_auth.dart';
-import '../../data/user_profile_repository.dart';
-import 'forgot_password_page.dart';
 import 'sign_up_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -25,7 +24,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _profileRepo = UserProfileRepository();
+  final _authService = AuthService();
   final _googleBackendAuth = GoogleBackendAuth();
   final _kakaoBackendAuth = KakaoBackendAuth();
   bool _obscurePassword = true;
@@ -50,27 +49,42 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _submitLogin() async {
     FocusScope.of(context).unfocus();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이메일과 비밀번호를 입력해 주세요.')),
+      );
+      return;
+    }
     setState(() => _loggingIn = true);
-    final profile = await _profileRepo.loadProfile();
-    if (profile != null) {
-      final ok = await _profileRepo.verifyLogin(
-        _emailController.text.trim(),
-        _passwordController.text,
+    try {
+      await _authService.signInWithEmail(
+        email: email,
+        password: password,
       );
       if (!mounted) return;
-      setState(() => _loggingIn = false);
-      if (!ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('이메일 또는 비밀번호가 올바르지 않아요.')),
-        );
-        return;
-      }
+      Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
+      );
+    } on AuthApiException catch (e) {
+      await _showAuthErrorDialog(
+        title: e.isNetworkError ? '로그인 서버에 연결할 수 없어요' : '로그인에 실패했어요',
+        body: e.message,
+      );
+    } on StateError catch (e) {
+      await _showAuthErrorDialog(
+        title: '로그인 상태를 저장하지 못했어요',
+        body: e.message,
+      );
+    } catch (e) {
+      await _showAuthErrorDialog(
+        title: '예상하지 못한 로그인 오류',
+        body: '$e',
+      );
+    } finally {
+      if (mounted) setState(() => _loggingIn = false);
     }
-    if (!mounted) return;
-    setState(() => _loggingIn = false);
-    Navigator.of(context).pushReplacement<void, void>(
-      MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
-    );
   }
 
   void _socialComingSoon(String name) {
@@ -428,23 +442,15 @@ class _LoginPageState extends State<LoginPage> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () async {
+                      onPressed: () {
                         FocusScope.of(context).unfocus();
-                        final ok = await Navigator.of(context).push<bool>(
-                          MaterialPageRoute<bool>(
-                            builder: (_) => const ForgotPasswordPage(),
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              '현재 백엔드에 비밀번호 찾기 API가 없어 앱 내에서 지원하지 않아요.',
+                            ),
                           ),
                         );
-                        if (!context.mounted) return;
-                        if (ok == true) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                '비밀번호를 재설정했어요. 새 비밀번호로 로그인해 주세요.',
-                              ),
-                            ),
-                          );
-                        }
                       },
                       child: const Text('비밀번호 찾기'),
                     ),

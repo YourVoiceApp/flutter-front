@@ -2,24 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 
 import '../../../app/config/auth_config.dart';
-import 'auth_api_client.dart';
-import 'auth_device_info.dart';
-import 'auth_session_store.dart';
-import 'user_profile_repository.dart';
+import 'auth_service.dart';
 
 /// Kakao SDK login -> backend `/auth/kakao` with Kakao access token -> persist app session.
 class KakaoBackendAuth {
   KakaoBackendAuth({
-    AuthApiClient? apiClient,
-    UserProfileRepository? profileRepository,
-    AuthSessionStore? sessionStore,
-  })  : _api = apiClient ?? AuthApiClient(),
-        _profiles = profileRepository ?? UserProfileRepository(),
-        _sessions = sessionStore ?? AuthSessionStore();
+    AuthService? authService,
+  }) : _authService = authService ?? AuthService();
 
-  final AuthApiClient _api;
-  final UserProfileRepository _profiles;
-  final AuthSessionStore _sessions;
+  final AuthService _authService;
 
   static Future<void>? _kakaoInit;
 
@@ -60,34 +51,14 @@ class KakaoBackendAuth {
       throw StateError('Kakao did not return an access token.');
     }
 
-    final AuthExchangeResult result;
     try {
-      result = await _api.exchangeKakaoAccessToken(
-        kakaoAccessToken,
-        deviceInfo: buildAuthDeviceInfo(),
+      await _authService.completeKakaoSignIn(
+        accessToken: kakaoAccessToken,
+        fallbackNickName: 'kakao',
       );
     } finally {
       // We do not use Kakao tokens for app auth; keep only our backend JWT.
       await TokenManagerProvider.instance.manager.clear();
     }
-
-    await _sessions.save(
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      userId: result.userId,
-    );
-
-    final email = result.email;
-    if (email == null || email.isEmpty) {
-      throw StateError(
-        'Backend did not return email. Check Kakao consent items or backend validation.',
-      );
-    }
-
-    await _profiles.saveSocialSignInProfile(
-      email: email,
-      nickname: email.split('@').first,
-      provider: 'kakao',
-    );
   }
 }

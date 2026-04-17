@@ -5,20 +5,12 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../shared/presentation/widgets/common_widgets.dart';
-<<<<<<< Updated upstream
-import '../room_demo_data.dart';
-=======
 import '../../domain/room.dart';
->>>>>>> Stashed changes
 
 /// 공유 음성 「사용」→ (프로필 기준) 문장 직접 입력 또는 마이크로 입력 후 듣기
 Future<void> showSharedVoicePlaySheet(
   BuildContext context,
-<<<<<<< Updated upstream
-  SharedVoiceDemo voice,
-=======
   RoomSharedVoice voice,
->>>>>>> Stashed changes
 ) {
   return showModalBottomSheet<void>(
     context: context,
@@ -34,11 +26,7 @@ Future<void> showSharedVoicePlaySheet(
 class _SharedVoicePlaySheet extends StatefulWidget {
   const _SharedVoicePlaySheet({required this.voice});
 
-<<<<<<< Updated upstream
-  final SharedVoiceDemo voice;
-=======
   final RoomSharedVoice voice;
->>>>>>> Stashed changes
 
   @override
   State<_SharedVoicePlaySheet> createState() => _SharedVoicePlaySheetState();
@@ -131,14 +119,7 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
       return;
     }
     if (!_speechReady) {
-<<<<<<< Updated upstream
-      showToast(
-        context,
-        '음성 인식을 사용할 수 없어요. 마이크·권한·브라우저 설정을 확인해 주세요.',
-      );
-=======
       showToast(context, '음성 인식을 사용할 수 없어요. 마이크·권한·브라우저 설정을 확인해 주세요.');
->>>>>>> Stashed changes
       return;
     }
     await _tts.stop();
@@ -292,12 +273,7 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                 maxLines: 6,
                 minLines: 3,
                 decoration: fieldDecoration(
-<<<<<<< Updated upstream
-                  hint:
-                      '이 음성으로 읽을 문장을 직접 쓰거나, 오른쪽 마이크로 말해 입력',
-=======
                   hint: '이 음성으로 읽을 문장을 직접 쓰거나, 오른쪽 마이크로 말해 입력',
->>>>>>> Stashed changes
                   icon: Icons.edit_note_rounded,
                   suffix: IconButton(
                     tooltip: _listening ? '말 입력 끝내기' : '말로 입력',
@@ -307,13 +283,8 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                       color: _listening
                           ? const Color(0xFFE07C4C)
                           : (_speechReady
-<<<<<<< Updated upstream
-                              ? const Color(0xFF3B6AF5)
-                              : const Color(0xFFCBD5E1)),
-=======
                                 ? const Color(0xFF3B6AF5)
                                 : const Color(0xFFCBD5E1)),
->>>>>>> Stashed changes
                     ),
                   ),
                 ),

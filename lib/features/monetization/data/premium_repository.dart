@@ -1,14 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-<<<<<<< Updated upstream
-/// 광고 제거 구매 상태 (실제 IAP 전 로컬 데모)
-class PremiumRepository {
-  PremiumRepository();
-
-  static const _keyAdsRemoved = 'premium_ads_removed_v1';
-
-  Future<bool> isAdsRemoved() async {
-=======
 import '../../../app/services/app_services.dart';
 import '../../../app/services/authenticated_api_client.dart';
 import '../../auth/data/auth_api_client.dart';
@@ -45,7 +36,6 @@ class PremiumRepository {
         // Fall back to cached state so the UI still works offline.
       }
     }
->>>>>>> Stashed changes
     final p = await SharedPreferences.getInstance();
     return p.getBool(_keyAdsRemoved) ?? false;
   }
@@ -54,8 +44,6 @@ class PremiumRepository {
     final p = await SharedPreferences.getInstance();
     await p.setBool(_keyAdsRemoved, value);
   }
-<<<<<<< Updated upstream
-=======
 
   Future<void> purchaseAdsRemoval({required String purchaseToken}) async {
     if (!await _authService.hasStoredSession()) {
@@ -77,5 +65,4 @@ class PremiumRepository {
     );
     await setAdsRemoved(true);
   }
->>>>>>> Stashed changes
 }

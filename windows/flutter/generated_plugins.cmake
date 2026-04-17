@@ -3,10 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-<<<<<<< Updated upstream
-=======
   audioplayers_windows
->>>>>>> Stashed changes
   flutter_secure_storage_windows
   flutter_tts
   speech_to_text_windows

@@ -63,10 +63,7 @@ class VoiceJob {
     required this.status,
     required this.createdAt,
     required this.folderId,
-<<<<<<< Updated upstream
-=======
     this.ownershipId,
->>>>>>> Stashed changes
     this.origin = VoiceOrigin.uploaded,
   });
 
@@ -80,12 +77,9 @@ class VoiceJob {
   /// [VoiceFolder] id
   final String folderId;
 
-<<<<<<< Updated upstream
-=======
   /// Backend ownership id used by delete / TTS APIs.
   final int? ownershipId;
 
->>>>>>> Stashed changes
   /// 획득 경로 — 마이페이지·목록 배지
   final VoiceOrigin origin;
 
@@ -94,10 +88,7 @@ class VoiceJob {
     DateTime? createdAt,
     String? folderId,
     String? fileName,
-<<<<<<< Updated upstream
-=======
     int? ownershipId,
->>>>>>> Stashed changes
     VoiceOrigin? origin,
   }) {
     return VoiceJob(
@@ -106,10 +97,7 @@ class VoiceJob {
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       folderId: folderId ?? this.folderId,
-<<<<<<< Updated upstream
-=======
       ownershipId: ownershipId ?? this.ownershipId,
->>>>>>> Stashed changes
       origin: origin ?? this.origin,
     );
   }

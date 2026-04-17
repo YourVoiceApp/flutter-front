@@ -6,20 +6,14 @@
 
 #include "generated_plugin_registrant.h"
 
-<<<<<<< Updated upstream
-=======
 #include <audioplayers_windows/audioplayers_windows_plugin.h>
->>>>>>> Stashed changes
 #include <flutter_secure_storage_windows/flutter_secure_storage_windows_plugin.h>
 #include <flutter_tts/flutter_tts_plugin.h>
 #include <speech_to_text_windows/speech_to_text_windows.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
-<<<<<<< Updated upstream
-=======
   AudioplayersWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("AudioplayersWindowsPlugin"));
->>>>>>> Stashed changes
   FlutterSecureStorageWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FlutterSecureStorageWindowsPlugin"));
   FlutterTtsPluginRegisterWithRegistrar(

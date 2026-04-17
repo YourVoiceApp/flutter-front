@@ -25,8 +25,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
-<<<<<<< Updated upstream
-=======
   audioplayers:
     dependency: "direct main"
     description:
@@ -83,7 +81,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.3.0"
->>>>>>> Stashed changes
   boolean_selector:
     dependency: transitive
     description:
@@ -784,8 +781,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
-<<<<<<< Updated upstream
-=======
   synchronized:
     dependency: transitive
     description:
@@ -794,7 +789,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.0"
->>>>>>> Stashed changes
   term_glyph:
     dependency: transitive
     description:
@@ -863,10 +857,10 @@ packages:
     dependency: transitive
     description:
       name: vm_service
-      sha256: "45caa6c5917fa127b5dbcfbd1fa60b14e583afdc08bfc96dda38886ca252eb60"
+      sha256: "046d3928e16fa4dc46e8350415661755ab759d9fc97fc21b5ab295f71e4f0499"
       url: "https://pub.dev"
     source: hosted
-    version: "15.0.2"
+    version: "15.1.0"
   web:
     dependency: transitive
     description:

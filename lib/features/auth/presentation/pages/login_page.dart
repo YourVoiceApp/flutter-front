@@ -6,12 +6,10 @@ import '../../../shared/presentation/pages/placeholder_page.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
 import '../../../shell/presentation/pages/main_shell_page.dart';
 import '../../../../app/app.dart';
+import '../../../../app/services/app_services.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../data/auth_api_client.dart';
-import '../../data/auth_service.dart';
 import '../../data/google_auth_flow_exception.dart';
-import '../../data/google_backend_auth.dart';
-import '../../data/kakao_backend_auth.dart';
 import 'sign_up_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -24,9 +22,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = AuthService();
-  final _googleBackendAuth = GoogleBackendAuth();
-  final _kakaoBackendAuth = KakaoBackendAuth();
+  final _services = AppServices.instance;
   bool _obscurePassword = true;
   bool _loggingIn = false;
   bool _googleSigningIn = false;
@@ -42,7 +38,8 @@ class _LoginPageState extends State<LoginPage> {
   void _openPlaceholder(String title) {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => PlaceholderPage(title: title, message: '$title 화면 (UI 데모)'),
+        builder: (_) =>
+            PlaceholderPage(title: title, message: '$title 화면 (UI 데모)'),
       ),
     );
   }
@@ -52,14 +49,14 @@ class _LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이메일과 비밀번호를 입력해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('이메일과 비밀번호를 입력해 주세요.')));
       return;
     }
     setState(() => _loggingIn = true);
     try {
-      await _authService.signInWithEmail(
+      await _services.authService.signInWithEmail(
         email: email,
         password: password,
       );
@@ -73,18 +70,21 @@ class _LoginPageState extends State<LoginPage> {
         body: e.message,
       );
     } on StateError catch (e) {
-      await _showAuthErrorDialog(
-        title: '로그인 상태를 저장하지 못했어요',
-        body: e.message,
-      );
+      await _showAuthErrorDialog(title: '로그인 상태를 저장하지 못했어요', body: e.message);
     } catch (e) {
-      await _showAuthErrorDialog(
-        title: '예상하지 못한 로그인 오류',
-        body: '$e',
-      );
+      await _showAuthErrorDialog(title: '예상하지 못한 로그인 오류', body: '$e');
     } finally {
       if (mounted) setState(() => _loggingIn = false);
     }
+  }
+
+  void _continueAsGuest() {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context).pushReplacement<void, void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const MainShellPage(isGuestMode: true),
+      ),
+    );
   }
 
   void _socialComingSoon(String name) {
@@ -149,12 +149,10 @@ class _LoginPageState extends State<LoginPage> {
       GoogleAuthFailureStage.local => 'Stage: Save on device',
     };
     final headline = switch (e.stage) {
-      GoogleAuthFailureStage.google =>
-        'Problem at Google sign-in step',
+      GoogleAuthFailureStage.google => 'Problem at Google sign-in step',
       GoogleAuthFailureStage.backend =>
         'Problem calling your server (network / URL / HTTP error)',
-      GoogleAuthFailureStage.local =>
-        'Problem saving login on this device',
+      GoogleAuthFailureStage.local => 'Problem saving login on this device',
     };
     await _showAuthErrorDialog(
       title: headline,
@@ -166,7 +164,7 @@ class _LoginPageState extends State<LoginPage> {
     FocusScope.of(context).unfocus();
     setState(() => _googleSigningIn = true);
     try {
-      await _googleBackendAuth.signInExchangeAndPersist();
+      await _services.googleBackendAuth.signInExchangeAndPersist();
       if (!mounted) return;
       Navigator.of(context).pushReplacement<void, void>(
         MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
@@ -201,9 +199,7 @@ class _LoginPageState extends State<LoginPage> {
       }
       await _showAuthErrorDialog(
         title: 'Google sign-in failed',
-        body: e.description?.isNotEmpty == true
-            ? e.description!
-            : e.toString(),
+        body: e.description?.isNotEmpty == true ? e.description! : e.toString(),
       );
     } on GoogleAuthFlowException catch (e) {
       await _showGoogleAuthDiagnostic(e);
@@ -224,19 +220,12 @@ class _LoginPageState extends State<LoginPage> {
     } on UnsupportedError catch (e) {
       await _showAuthErrorDialog(
         title: 'Not supported here',
-        body: e.message ??
-            'Google sign-in is not available on this platform.',
+        body: e.message ?? 'Google sign-in is not available on this platform.',
       );
     } on StateError catch (e) {
-      await _showAuthErrorDialog(
-        title: 'Error',
-        body: e.message,
-      );
+      await _showAuthErrorDialog(title: 'Error', body: e.message);
     } catch (e) {
-      await _showAuthErrorDialog(
-        title: 'Unexpected error',
-        body: '$e',
-      );
+      await _showAuthErrorDialog(title: 'Unexpected error', body: '$e');
     } finally {
       if (mounted) setState(() => _googleSigningIn = false);
     }
@@ -246,7 +235,7 @@ class _LoginPageState extends State<LoginPage> {
     FocusScope.of(context).unfocus();
     setState(() => _kakaoSigningIn = true);
     try {
-      await _kakaoBackendAuth.signInExchangeAndPersist();
+      await _services.kakaoBackendAuth.signInExchangeAndPersist();
       if (!mounted) return;
       Navigator.of(context).pushReplacement<void, void>(
         MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
@@ -271,8 +260,7 @@ class _LoginPageState extends State<LoginPage> {
     } on UnsupportedError catch (e) {
       await _showAuthErrorDialog(
         title: 'Not supported here',
-        body: e.message ??
-            'Kakao sign-in is not available on this platform.',
+        body: e.message ?? 'Kakao sign-in is not available on this platform.',
       );
     } on StateError catch (e) {
       await _showAuthErrorDialog(
@@ -329,7 +317,10 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               ListTile(
-                leading: const Icon(Icons.folder_outlined, color: YeolpumtaTheme.accent),
+                leading: const Icon(
+                  Icons.folder_outlined,
+                  color: YeolpumtaTheme.accent,
+                ),
                 title: const Text('프로젝트'),
                 onTap: () {
                   Navigator.pop(context);
@@ -337,7 +328,10 @@ class _LoginPageState extends State<LoginPage> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.settings_outlined, color: YeolpumtaTheme.accent),
+                leading: const Icon(
+                  Icons.settings_outlined,
+                  color: YeolpumtaTheme.accent,
+                ),
                 title: const Text('설정'),
                 onTap: () {
                   Navigator.pop(context);
@@ -502,7 +496,10 @@ class _LoginPageState extends State<LoginPage> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: YeolpumtaTheme.accent,
                         minimumSize: const Size.fromHeight(52),
-                        side: const BorderSide(color: YeolpumtaTheme.accent, width: 1.2),
+                        side: const BorderSide(
+                          color: YeolpumtaTheme.accent,
+                          width: 1.2,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -516,13 +513,23 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: _loggingIn ? null : _continueAsGuest,
+                      child: const Text('로그인 없이 둘러보기'),
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 28),
             Row(
               children: [
-                Expanded(child: Divider(color: YeolpumtaTheme.divider, height: 1)),
+                Expanded(
+                  child: Divider(color: YeolpumtaTheme.divider, height: 1),
+                ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: Text(
@@ -530,11 +537,15 @@ class _LoginPageState extends State<LoginPage> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.9),
+                      color: YeolpumtaTheme.textSecondary.withValues(
+                        alpha: 0.9,
+                      ),
                     ),
                   ),
                 ),
-                Expanded(child: Divider(color: YeolpumtaTheme.divider, height: 1)),
+                Expanded(
+                  child: Divider(color: YeolpumtaTheme.divider, height: 1),
+                ),
               ],
             ),
             const SizedBox(height: 20),

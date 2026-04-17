@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/services/app_services.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../data/auth_api_client.dart';
-import '../../data/auth_service.dart';
-import '../../data/user_profile_repository.dart';
 import '../../domain/social_account_link.dart';
 import '../../domain/user_profile.dart';
 
 class AccountDetailPage extends StatefulWidget {
-  const AccountDetailPage({
-    super.key,
-    this.onAccountDeleted,
-  });
+  const AccountDetailPage({super.key, this.onAccountDeleted});
 
   final VoidCallback? onAccountDeleted;
 
@@ -20,8 +16,8 @@ class AccountDetailPage extends StatefulWidget {
 }
 
 class _AccountDetailPageState extends State<AccountDetailPage> {
-  final _authService = AuthService();
-  final _profileRepository = UserProfileRepository();
+  final _authService = AppServices.instance.authService;
+  final _profileRepository = AppServices.instance.userProfileRepository;
 
   UserProfile? _profile;
   List<SocialAccountLink> _socialAccounts = const [];
@@ -100,9 +96,9 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
     if (profile == null) return;
     final nick = _nicknameCtrl.text.trim();
     if (nick.length < 2 || nick.length > 16) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('닉네임은 2~16자로 입력해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('닉네임은 2~16자로 입력해 주세요.')));
       return;
     }
 
@@ -113,14 +109,14 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
       await _load();
       if (!mounted) return;
       setState(() => _editing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('닉네임을 저장했어요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('닉네임을 저장했어요.')));
     } on AuthApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -132,21 +128,21 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
     final newPassword = _newPasswordCtrl.text;
     final newPasswordAgain = _newPasswordAgainCtrl.text;
     if (profile.hasPassword && _currentPasswordCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('현재 비밀번호를 입력해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('현재 비밀번호를 입력해 주세요.')));
       return;
     }
     if (newPassword.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('새 비밀번호는 8자 이상으로 입력해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('새 비밀번호는 8자 이상으로 입력해 주세요.')));
       return;
     }
     if (newPassword != newPasswordAgain) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('새 비밀번호가 서로 달라요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('새 비밀번호가 서로 달라요.')));
       return;
     }
 
@@ -154,8 +150,7 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
     setState(() => _savingPassword = true);
     try {
       await _authService.updatePassword(
-        currentPassword:
-            profile.hasPassword ? _currentPasswordCtrl.text : null,
+        currentPassword: profile.hasPassword ? _currentPasswordCtrl.text : null,
         newPassword: newPassword,
       );
       _currentPasswordCtrl.clear();
@@ -163,14 +158,14 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
       _newPasswordAgainCtrl.clear();
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('비밀번호를 변경했어요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('비밀번호를 변경했어요.')));
     } on AuthApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _savingPassword = false);
     }
@@ -207,9 +202,9 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
       widget.onAccountDeleted?.call();
     } on AuthApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _deleting = false);
     }
@@ -245,148 +240,142 @@ class _AccountDetailPageState extends State<AccountDetailPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _profile == null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  '계정 정보를 불러오지 못했어요.\n다시 로그인해 주세요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.45,
+                    color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.95),
+                  ),
+                ),
+              ),
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+              children: [
+                _DetailTile(label: '이메일', value: _profile!.email, locked: true),
+                const SizedBox(height: 12),
+                if (!_editing) ...[
+                  _DetailTile(label: '닉네임', value: _profile!.nickname),
+                  const SizedBox(height: 12),
+                  _DetailTile(
+                    label: '가입일',
+                    value: _dateLabel(_profile!.createdAt),
+                  ),
+                  const SizedBox(height: 20),
+                  _SocialAccountsSection(accounts: _socialAccounts),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12, left: 4),
                     child: Text(
-                      '계정 정보를 불러오지 못했어요.\n다시 로그인해 주세요.',
-                      textAlign: TextAlign.center,
+                      '이메일은 변경할 수 없어요.',
                       style: TextStyle(
-                        fontSize: 15,
-                        height: 1.45,
-                        color:
-                            YeolpumtaTheme.textSecondary.withValues(alpha: 0.95),
+                        fontSize: 12,
+                        color: YeolpumtaTheme.textSecondary.withValues(
+                          alpha: 0.88,
+                        ),
                       ),
                     ),
                   ),
-                )
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-                  children: [
-                    _DetailTile(
-                      label: '이메일',
-                      value: _profile!.email,
-                      locked: true,
+                  const SizedBox(height: 28),
+                  _PasswordSection(
+                    profile: _profile!,
+                    currentPasswordCtrl: _currentPasswordCtrl,
+                    newPasswordCtrl: _newPasswordCtrl,
+                    newPasswordAgainCtrl: _newPasswordAgainCtrl,
+                    saving: _savingPassword,
+                    onSubmit: _changePassword,
+                  ),
+                  const SizedBox(height: 28),
+                  OutlinedButton(
+                    onPressed: _deleting ? null : _confirmDeleteAccount,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade700,
+                      side: BorderSide(color: Colors.red.shade700),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    if (!_editing) ...[
-                      _DetailTile(
-                        label: '닉네임',
-                        value: _profile!.nickname,
-                      ),
-                      const SizedBox(height: 12),
-                      _DetailTile(
-                        label: '가입일',
-                        value: _dateLabel(_profile!.createdAt),
-                      ),
-                      const SizedBox(height: 20),
-                      _SocialAccountsSection(accounts: _socialAccounts),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12, left: 4),
-                        child: Text(
-                          '이메일은 변경할 수 없어요.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: YeolpumtaTheme.textSecondary
-                                .withValues(alpha: 0.88),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      _PasswordSection(
-                        profile: _profile!,
-                        currentPasswordCtrl: _currentPasswordCtrl,
-                        newPasswordCtrl: _newPasswordCtrl,
-                        newPasswordAgainCtrl: _newPasswordAgainCtrl,
-                        saving: _savingPassword,
-                        onSubmit: _changePassword,
-                      ),
-                      const SizedBox(height: 28),
-                      OutlinedButton(
-                        onPressed: _deleting ? null : _confirmDeleteAccount,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red.shade700,
-                          side: BorderSide(color: Colors.red.shade700),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('회원 탈퇴'),
-                      ),
-                    ] else ...[
-                      const Text(
-                        '닉네임',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: YeolpumtaTheme.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _nicknameCtrl,
-                        maxLength: 16,
-                        buildCounter: (
+                    child: const Text('회원 탈퇴'),
+                  ),
+                ] else ...[
+                  const Text(
+                    '닉네임',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: YeolpumtaTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _nicknameCtrl,
+                    maxLength: 16,
+                    buildCounter:
+                        (
                           context, {
                           required currentLength,
                           required isFocused,
                           maxLength,
-                        }) =>
-                            const SizedBox.shrink(),
-                        decoration: InputDecoration(
-                          hintText: '2~16자',
-                          filled: true,
-                          fillColor: YeolpumtaTheme.surface,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: YeolpumtaTheme.divider),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: YeolpumtaTheme.accent,
-                              width: 1.2,
+                        }) => const SizedBox.shrink(),
+                    decoration: InputDecoration(
+                      hintText: '2~16자',
+                      filled: true,
+                      fillColor: YeolpumtaTheme.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: YeolpumtaTheme.divider,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: YeolpumtaTheme.accent,
+                          width: 1.2,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: _saving ? null : _saveNickname,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: YeolpumtaTheme.accent,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: _saving
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            '저장',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 14,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: _saving ? null : _saveNickname,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: YeolpumtaTheme.accent,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: _saving
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                '저장',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                ],
+              ],
+            ),
     );
   }
 }
@@ -451,9 +440,7 @@ class _DetailTile extends StatelessWidget {
 }
 
 class _SocialAccountsSection extends StatelessWidget {
-  const _SocialAccountsSection({
-    required this.accounts,
-  });
+  const _SocialAccountsSection({required this.accounts});
 
   final List<SocialAccountLink> accounts;
 
@@ -506,8 +493,9 @@ class _SocialAccountsSection extends StatelessWidget {
                       account.email,
                       style: TextStyle(
                         fontSize: 13,
-                        color:
-                            YeolpumtaTheme.textSecondary.withValues(alpha: 0.92),
+                        color: YeolpumtaTheme.textSecondary.withValues(
+                          alpha: 0.92,
+                        ),
                       ),
                     ),
                   ],
@@ -574,27 +562,21 @@ class _PasswordSection extends StatelessWidget {
             TextField(
               controller: currentPasswordCtrl,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: '현재 비밀번호',
-              ),
+              decoration: const InputDecoration(labelText: '현재 비밀번호'),
             ),
           ],
           const SizedBox(height: 14),
           TextField(
             controller: newPasswordCtrl,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: '새 비밀번호',
-            ),
+            decoration: const InputDecoration(labelText: '새 비밀번호'),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: newPasswordAgainCtrl,
             obscureText: true,
             onSubmitted: (_) => onSubmit(),
-            decoration: const InputDecoration(
-              labelText: '새 비밀번호 확인',
-            ),
+            decoration: const InputDecoration(labelText: '새 비밀번호 확인'),
           ),
           const SizedBox(height: 18),
           FilledButton(

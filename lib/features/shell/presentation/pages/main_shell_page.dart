@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'yeolpumta_main_shell.dart';
 
 class MainShellPage extends StatelessWidget {
-  const MainShellPage({super.key});
+  const MainShellPage({super.key, this.isGuestMode = false});
+
+  final bool isGuestMode;
 
   @override
   Widget build(BuildContext context) {
-    return const YeolpumtaMainShell();
+    return YeolpumtaMainShell(isGuestMode: isGuestMode);
   }
 }

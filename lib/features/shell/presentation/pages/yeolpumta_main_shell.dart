@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/services/app_services.dart';
 import '../../../auth/data/auth_service.dart';
 import '../../../auth/data/user_profile_repository.dart';
 import '../../../auth/domain/user_profile.dart';
@@ -20,7 +21,9 @@ import '../../../../app/theme/yeolpumta_theme.dart';
 
 /// 핵심만: 음성 · 함께 · 마켓 (듣기는 음성 카드에서)
 class YeolpumtaMainShell extends StatefulWidget {
-  const YeolpumtaMainShell({super.key});
+  const YeolpumtaMainShell({super.key, this.isGuestMode = false});
+
+  final bool isGuestMode;
 
   @override
   State<YeolpumtaMainShell> createState() => _YeolpumtaMainShellState();
@@ -28,12 +31,15 @@ class YeolpumtaMainShell extends StatefulWidget {
 
 class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
   final GlobalKey<ScaffoldState> _shellKey = GlobalKey<ScaffoldState>();
-  final AuthService _authService = AuthService();
+  final AuthService _authService = AppServices.instance.authService;
   final VoiceLibraryRepository _repo = VoiceLibraryRepository();
-  final UserProfileRepository _profileRepo = UserProfileRepository();
+  final UserProfileRepository _profileRepo =
+      AppServices.instance.userProfileRepository;
   final PremiumRepository _premiumRepo = PremiumRepository();
-  VoiceLibrarySnapshot _data =
-      const VoiceLibrarySnapshot(folders: [], jobs: []);
+  VoiceLibrarySnapshot _data = const VoiceLibrarySnapshot(
+    folders: [],
+    jobs: [],
+  );
   UserProfile? _profile;
   bool _ready = false;
   bool _adsRemoved = false;
@@ -59,9 +65,8 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     });
   }
 
-  List<VoiceJob> get _completed => _data.jobs
-      .where((j) => j.status == VoiceJobStatus.completed)
-      .toList();
+  List<VoiceJob> get _completed =>
+      _data.jobs.where((j) => j.status == VoiceJobStatus.completed).toList();
 
   Future<String> _createFolderForUpload(String name) async {
     final next = await _repo.createFolder(_data, name);
@@ -181,10 +186,19 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     await fn();
   }
 
+  Future<void> _goToLogin() async {
+    Navigator.of(context).pushAndRemoveUntil<void>(
+      MaterialPageRoute<void>(builder: (_) => const LoginPage()),
+      (_) => false,
+    );
+  }
+
   Future<void> _goMyPage() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => MyPage(
+          isGuestMode: widget.isGuestMode,
+          onRequireLogin: _goToLogin,
           repository: _repo,
           profileRepository: _profileRepo,
           folders: _data.folders,
@@ -193,10 +207,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
           onMoveJob: _moveJob,
           onListenTap: _openListen,
           onAccountDeleted: () {
-            Navigator.of(context).pushAndRemoveUntil<void>(
-              MaterialPageRoute<void>(builder: (_) => const LoginPage()),
-              (_) => false,
-            );
+            _goToLogin();
           },
         ),
       ),
@@ -210,21 +221,18 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
   Future<void> _goSettings() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => const PlaceholderPage(
-          title: '설정',
-          message: '알림·테마·계정·약관 (UI 데모)',
-        ),
+        builder: (_) =>
+            const PlaceholderPage(title: '설정', message: '알림·테마·계정·약관 (UI 데모)'),
       ),
     );
   }
 
   Future<void> _logout() async {
-    await _authService.logout();
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil<void>(
-      MaterialPageRoute<void>(builder: (_) => const LoginPage()),
-      (_) => false,
-    );
+    if (!widget.isGuestMode) {
+      await _authService.logout();
+      if (!mounted) return;
+    }
+    await _goToLogin();
   }
 
   @override
@@ -284,13 +292,17 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _profile == null
+                      widget.isGuestMode
+                          ? '게스트로 둘러보는 중 · 로그인 후 계정 기능 사용 가능'
+                          : _profile == null
                           ? '로그인 유지 중'
                           : '${_profile!.nickname} · ${_profile!.email}',
                       style: TextStyle(
                         fontSize: 13,
                         height: 1.3,
-                        color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.92),
+                        color: YeolpumtaTheme.textSecondary.withValues(
+                          alpha: 0.92,
+                        ),
                       ),
                     ),
                   ],
@@ -331,15 +343,18 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
                     ListTile(
                       leading: Icon(
                         Icons.help_outline_rounded,
-                        color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.9),
+                        color: YeolpumtaTheme.textSecondary.withValues(
+                          alpha: 0.9,
+                        ),
                       ),
                       title: Text(
                         '고객센터',
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
                           fontSize: 16,
-                          color:
-                              YeolpumtaTheme.textSecondary.withValues(alpha: 0.95),
+                          color: YeolpumtaTheme.textSecondary.withValues(
+                            alpha: 0.95,
+                          ),
                         ),
                       ),
                       onTap: () => _openFromDrawer(() async {
@@ -359,15 +374,21 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
               const Divider(height: 1),
               ListTile(
                 leading: Icon(
-                  Icons.logout_rounded,
-                  color: Colors.red.shade700,
+                  widget.isGuestMode
+                      ? Icons.login_rounded
+                      : Icons.logout_rounded,
+                  color: widget.isGuestMode
+                      ? YeolpumtaTheme.accent
+                      : Colors.red.shade700,
                 ),
                 title: Text(
-                  '로그아웃',
+                  widget.isGuestMode ? '로그인 / 회원가입' : '로그아웃',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
-                    color: Colors.red.shade700,
+                    color: widget.isGuestMode
+                        ? YeolpumtaTheme.accent
+                        : Colors.red.shade700,
                   ),
                 ),
                 onTap: () => _openFromDrawer(_logout),

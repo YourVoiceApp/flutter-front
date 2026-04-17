@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../app/services/app_services.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
 import '../../data/auth_api_client.dart';
-import '../../data/auth_service.dart';
 import '../../../shell/presentation/pages/main_shell_page.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 
@@ -15,7 +15,7 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  final _authService = AuthService();
+  final _authService = AppServices.instance.authService;
   final _nicknameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
@@ -49,9 +49,9 @@ class _SignUpPageState extends State<SignUpPage> {
     FocusScope.of(context).unfocus();
     final email = _emailCtrl.text.trim();
     if (!_looksLikeEmail(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이메일 형식을 확인해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('이메일 형식을 확인해 주세요.')));
       return;
     }
     setState(() => _sendingCode = true);
@@ -70,9 +70,9 @@ class _SignUpPageState extends State<SignUpPage> {
       );
     } on AuthApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _sendingCode = false);
     }
@@ -83,23 +83,20 @@ class _SignUpPageState extends State<SignUpPage> {
     final email = _emailCtrl.text.trim();
     final code = _codeCtrl.text.trim();
     if (!_looksLikeEmail(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이메일을 확인해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('이메일을 확인해 주세요.')));
       return;
     }
     if (code.length != 6 || int.tryParse(code) == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('인증번호 6자리(숫자)를 입력해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('인증번호 6자리(숫자)를 입력해 주세요.')));
       return;
     }
     setState(() => _verifyingCode = true);
     try {
-      await _authService.verifyEmailCode(
-        email: email,
-        code: code,
-      );
+      await _authService.verifyEmailCode(email: email, code: code);
       if (!mounted) return;
       setState(() => _emailVerified = true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -110,9 +107,9 @@ class _SignUpPageState extends State<SignUpPage> {
       );
     } on AuthApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _verifyingCode = false);
     }
@@ -122,35 +119,35 @@ class _SignUpPageState extends State<SignUpPage> {
     FocusScope.of(context).unfocus();
     final nick = _nicknameCtrl.text.trim();
     if (nick.length < 2 || nick.length > 16) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('닉네임은 2~16자로 입력해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('닉네임은 2~16자로 입력해 주세요.')));
       return;
     }
     if (!_looksLikeEmail(_emailCtrl.text)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이메일을 확인해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('이메일을 확인해 주세요.')));
       return;
     }
     if (!_emailVerified) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이메일 인증을 먼저 완료해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('이메일 인증을 먼저 완료해 주세요.')));
       return;
     }
     final p = _passwordCtrl.text;
     final p2 = _passwordAgainCtrl.text;
     if (p.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('비밀번호는 8자 이상으로 설정해 주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('비밀번호는 8자 이상으로 설정해 주세요.')));
       return;
     }
     if (p != p2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('비밀번호가 서로 달라요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('비밀번호가 서로 달라요.')));
       return;
     }
 
@@ -167,14 +164,14 @@ class _SignUpPageState extends State<SignUpPage> {
       );
     } on AuthApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('회원가입 중 오류가 발생했어요: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('회원가입 중 오류가 발생했어요: $e')));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -184,9 +181,7 @@ class _SignUpPageState extends State<SignUpPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: YeolpumtaTheme.bg,
-      appBar: AppBar(
-        title: const Text('회원가입'),
-      ),
+      appBar: AppBar(title: const Text('회원가입')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
@@ -217,13 +212,13 @@ class _SignUpPageState extends State<SignUpPage> {
                     controller: _nicknameCtrl,
                     textInputAction: TextInputAction.next,
                     maxLength: 16,
-                    buildCounter: (
-                      context, {
-                      required currentLength,
-                      required isFocused,
-                      maxLength,
-                    }) =>
-                        const SizedBox.shrink(),
+                    buildCounter:
+                        (
+                          context, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) => const SizedBox.shrink(),
                     decoration: fieldDecoration(
                       hint: '앱에서 사용할 이름',
                       icon: Icons.badge_outlined,
@@ -273,7 +268,9 @@ class _SignUpPageState extends State<SignUpPage> {
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.35,
-                      color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.88),
+                      color: YeolpumtaTheme.textSecondary.withValues(
+                        alpha: 0.88,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -293,21 +290,22 @@ class _SignUpPageState extends State<SignUpPage> {
                           decoration: fieldDecoration(
                             hint: '인증번호 6자리',
                             icon: Icons.pin_outlined,
-                          ).copyWith(
-                            counterText: '',
-                          ),
+                          ).copyWith(counterText: ''),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: OutlinedButton(
-                          onPressed: (_emailVerified || _sendingCode || _submitting)
+                          onPressed:
+                              (_emailVerified || _sendingCode || _submitting)
                               ? null
                               : _sendVerificationCode,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: YeolpumtaTheme.accent,
-                            side: const BorderSide(color: YeolpumtaTheme.accent),
+                            side: const BorderSide(
+                              color: YeolpumtaTheme.accent,
+                            ),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 14,
@@ -320,7 +318,9 @@ class _SignUpPageState extends State<SignUpPage> {
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Text(
                                   '인증번호\n받기',
@@ -340,14 +340,17 @@ class _SignUpPageState extends State<SignUpPage> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: (_codeSent && !_verifyingCode && !_submitting)
+                        onPressed:
+                            (_codeSent && !_verifyingCode && !_submitting)
                             ? _confirmVerificationCode
                             : null,
                         child: _verifyingCode
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Text('인증 확인'),
                       ),
@@ -426,7 +429,8 @@ class _SignUpPageState extends State<SignUpPage> {
                       suffix: IconButton(
                         onPressed: () {
                           setState(
-                            () => _obscurePasswordAgain = !_obscurePasswordAgain,
+                            () =>
+                                _obscurePasswordAgain = !_obscurePasswordAgain,
                           );
                         },
                         icon: Icon(

@@ -19,7 +19,9 @@ class MyPage extends StatefulWidget {
     required this.onAdvanceDemo,
     required this.onDeleteJob,
     required this.onMoveJob,
+    this.isGuestMode = false,
     this.onListenTap,
+    this.onRequireLogin,
     this.onAccountDeleted,
   });
 
@@ -29,9 +31,11 @@ class MyPage extends StatefulWidget {
   final Future<void> Function(String id) onAdvanceDemo;
   final Future<void> Function(String id) onDeleteJob;
   final Future<void> Function(String jobId, String folderId) onMoveJob;
+  final bool isGuestMode;
 
   /// 음성 카드 탭 → 듣기 (없으면 카드 탭 무반응)
   final void Function(VoiceJob job)? onListenTap;
+  final Future<void> Function()? onRequireLogin;
   final VoidCallback? onAccountDeleted;
 
   @override
@@ -63,17 +67,28 @@ class _MyPageState extends State<MyPage> {
   }
 
   Future<void> _openAccountDetail() async {
-    if (_profile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('회원가입을 하면 계정 정보를 볼 수 있어요.')),
+    if (widget.isGuestMode || _profile == null) {
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('게스트 모드에서는 계정 정보가 없어요. 로그인 후 이용해 주세요.'),
+          action: widget.onRequireLogin == null
+              ? null
+              : SnackBarAction(
+                  label: '로그인',
+                  onPressed: () {
+                    widget.onRequireLogin!.call();
+                  },
+                ),
+        ),
       );
       return;
     }
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => AccountDetailPage(
-          onAccountDeleted: widget.onAccountDeleted,
-        ),
+        builder: (_) =>
+            AccountDetailPage(onAccountDeleted: widget.onAccountDeleted),
       ),
     );
     await _reload();
@@ -125,10 +140,7 @@ class _MyPageState extends State<MyPage> {
               children: [
                 const Text(
                   '옮길 폴더',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 12),
                 ..._sortedFolders.map(
@@ -156,9 +168,7 @@ class _MyPageState extends State<MyPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: YeolpumtaTheme.bg,
-      appBar: AppBar(
-        title: const Text('마이페이지'),
-      ),
+      appBar: AppBar(title: const Text('마이페이지')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -186,9 +196,7 @@ class _MyPageState extends State<MyPage> {
                                 ],
                               ),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: YeolpumtaTheme.divider,
-                              ),
+                              border: Border.all(color: YeolpumtaTheme.divider),
                               boxShadow: const [
                                 BoxShadow(
                                   color: Color(0x12000000),
@@ -208,8 +216,9 @@ class _MyPageState extends State<MyPage> {
                                     borderRadius: BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: YeolpumtaTheme.accent
-                                            .withValues(alpha: 0.15),
+                                        color: YeolpumtaTheme.accent.withValues(
+                                          alpha: 0.15,
+                                        ),
                                         blurRadius: 12,
                                         offset: const Offset(0, 4),
                                       ),
@@ -228,7 +237,9 @@ class _MyPageState extends State<MyPage> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        _profile?.nickname ?? '프로필 없음',
+                                        widget.isGuestMode
+                                            ? '게스트'
+                                            : _profile?.nickname ?? '프로필 없음',
                                         style: const TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.w800,
@@ -238,8 +249,10 @@ class _MyPageState extends State<MyPage> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        _profile?.email ??
-                                            '회원가입 시 계정이 저장돼요',
+                                        widget.isGuestMode
+                                            ? '로그인 없이 둘러보는 중이에요'
+                                            : _profile?.email ??
+                                                  '회원가입 시 계정이 저장돼요',
                                         style: TextStyle(
                                           fontSize: 13,
                                           color: YeolpumtaTheme.textSecondary
@@ -279,29 +292,38 @@ class _MyPageState extends State<MyPage> {
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Text(
-                                                '상세보기',
+                                                widget.isGuestMode
+                                                    ? '로그인하기'
+                                                    : '상세보기',
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w800,
-                                                  color: _profile != null
+                                                  color:
+                                                      widget.isGuestMode ||
+                                                          _profile != null
                                                       ? YeolpumtaTheme.accent
                                                       : YeolpumtaTheme
-                                                          .textSecondary
-                                                          .withValues(
-                                                          alpha: 0.45,
-                                                        ),
+                                                            .textSecondary
+                                                            .withValues(
+                                                              alpha: 0.45,
+                                                            ),
                                                 ),
                                               ),
                                               Icon(
-                                                Icons.chevron_right_rounded,
+                                                widget.isGuestMode
+                                                    ? Icons.login_rounded
+                                                    : Icons
+                                                          .chevron_right_rounded,
                                                 size: 20,
-                                                color: _profile != null
+                                                color:
+                                                    widget.isGuestMode ||
+                                                        _profile != null
                                                     ? YeolpumtaTheme.accent
                                                     : YeolpumtaTheme
-                                                        .textSecondary
-                                                        .withValues(
-                                                        alpha: 0.35,
-                                                      ),
+                                                          .textSecondary
+                                                          .withValues(
+                                                            alpha: 0.35,
+                                                          ),
                                               ),
                                             ],
                                           ),
@@ -329,8 +351,9 @@ class _MyPageState extends State<MyPage> {
                             style: TextStyle(
                               fontSize: 13,
                               height: 1.4,
-                              color: YeolpumtaTheme.textSecondary
-                                  .withValues(alpha: 0.92),
+                              color: YeolpumtaTheme.textSecondary.withValues(
+                                alpha: 0.92,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -366,11 +389,11 @@ class _MyPageState extends State<MyPage> {
                                 child: _OriginStatCard(
                                   origin: VoiceOrigin.sharedRoom,
                                   count: _count(VoiceOrigin.sharedRoom),
-                                  selected: _originFilter ==
-                                      VoiceOrigin.sharedRoom,
+                                  selected:
+                                      _originFilter == VoiceOrigin.sharedRoom,
                                   onTap: () => setState(
-                                    () => _originFilter =
-                                        VoiceOrigin.sharedRoom,
+                                    () =>
+                                        _originFilter = VoiceOrigin.sharedRoom,
                                   ),
                                 ),
                               ),
@@ -382,8 +405,7 @@ class _MyPageState extends State<MyPage> {
                                   selected:
                                       _originFilter == VoiceOrigin.purchased,
                                   onTap: () => setState(
-                                    () => _originFilter =
-                                        VoiceOrigin.purchased,
+                                    () => _originFilter = VoiceOrigin.purchased,
                                   ),
                                 ),
                               ),
@@ -406,8 +428,9 @@ class _MyPageState extends State<MyPage> {
                               Icon(
                                 Icons.inventory_2_outlined,
                                 size: 48,
-                                color: YeolpumtaTheme.textSecondary
-                                    .withValues(alpha: 0.45),
+                                color: YeolpumtaTheme.textSecondary.withValues(
+                                  alpha: 0.45,
+                                ),
                               ),
                               const SizedBox(height: 12),
                               Text(
@@ -478,9 +501,7 @@ class _OriginStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = origin == null ? '전체' : origin!.label;
-    final style = origin == null
-        ? null
-        : VoiceOriginStyle.of(origin!);
+    final style = origin == null ? null : VoiceOriginStyle.of(origin!);
 
     return Material(
       color: Colors.transparent,
@@ -496,8 +517,9 @@ class _OriginStatCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
-                  ? (style?.accent ?? YeolpumtaTheme.accent)
-                      .withValues(alpha: 0.45)
+                  ? (style?.accent ?? YeolpumtaTheme.accent).withValues(
+                      alpha: 0.45,
+                    )
                   : YeolpumtaTheme.divider,
               width: selected ? 1.4 : 1,
             ),
@@ -508,16 +530,14 @@ class _OriginStatCard extends StatelessWidget {
               Row(
                 children: [
                   if (origin != null)
-                    Icon(
-                      style!.icon,
-                      size: 18,
-                      color: style.accent,
-                    )
+                    Icon(style!.icon, size: 18, color: style.accent)
                   else
                     Icon(
                       Icons.layers_rounded,
                       size: 18,
-                      color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.85),
+                      color: YeolpumtaTheme.textSecondary.withValues(
+                        alpha: 0.85,
+                      ),
                     ),
                   const Spacer(),
                   Text(

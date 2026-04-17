@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/services/app_services.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
-import '../../data/auth_service.dart';
 import '../../../shell/presentation/pages/main_shell_page.dart';
 import 'login_page.dart';
 
@@ -13,7 +13,7 @@ class AuthGatePage extends StatefulWidget {
 }
 
 class _AuthGatePageState extends State<AuthGatePage> {
-  final _authService = AuthService();
+  final _authService = AppServices.instance.authService;
 
   @override
   void initState() {
@@ -36,9 +36,7 @@ class _AuthGatePageState extends State<AuthGatePage> {
   Widget build(BuildContext context) {
     return const Scaffold(
       backgroundColor: YeolpumtaTheme.bg,
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }

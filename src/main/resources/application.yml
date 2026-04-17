@@ -52,3 +52,9 @@ supertone:
   api:
     base-url: ${SUPERTONE_API_BASE_URL:https://supertoneapi.com}
     key: ${SUPERTONE_API_KEY:}
+
+billing:
+  google-play:
+    package-name: ${GOOGLE_PLAY_PACKAGE_NAME:}
+    service-account-json: ${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:}
+    service-account-path: ${GOOGLE_PLAY_SERVICE_ACCOUNT_PATH:}

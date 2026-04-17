@@ -22,6 +22,7 @@ public class BillingService {
     private final PaymentOrderRepository paymentOrderRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final EntitlementRepository entitlementRepository;
+    private final GooglePlayPurchaseVerifier googlePlayPurchaseVerifier;
 
     @Transactional(readOnly = true)
     public AdsRemovalStatusResponse getAdsRemovalStatus(User user) {
@@ -49,7 +50,8 @@ public class BillingService {
 
     @Transactional
     public AdsRemovalOrderResponse confirmAdsRemoval(User user, AdsRemovalConfirmRequest request) {
-        if (!StringUtils.hasText(request.purchaseToken())) {
+        String purchaseToken = request.purchaseToken() != null ? request.purchaseToken().trim() : null;
+        if (!StringUtils.hasText(purchaseToken)) {
             throw ApiException.error(ErrorCode.INVALID_REQUEST, "Purchase token is required");
         }
 
@@ -66,18 +68,21 @@ public class BillingService {
 
         if (paymentTransactionRepository.existsByProviderAndProviderTransactionId(
                 PaymentTransaction.PaymentProvider.GOOGLE,
-                request.purchaseToken()
+                purchaseToken
         )) {
             throw ApiException.error(ErrorCode.INVALID_REQUEST, "Purchase token has already been used");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        GooglePlayPurchaseVerifier.VerificationResult verificationResult =
+                googlePlayPurchaseVerifier.verifyProductPurchase(order.getProductId(), purchaseToken);
+
+        LocalDateTime now = verificationResult.purchasedAt();
         order.markPaid(now);
 
         paymentTransactionRepository.save(PaymentTransaction.builder()
                 .order(order)
                 .provider(PaymentTransaction.PaymentProvider.GOOGLE)
-                .providerTransactionId(request.purchaseToken().trim())
+                .providerTransactionId(purchaseToken)
                 .verifiedAt(now)
                 .build());
 

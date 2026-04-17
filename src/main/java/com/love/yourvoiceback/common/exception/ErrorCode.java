@@ -23,6 +23,9 @@ public enum ErrorCode {
     INVALID_GOOGLE_ID_TOKEN(HttpStatus.UNAUTHORIZED, "Invalid google id token payload"),
     GOOGLE_TOKEN_AUDIENCE_MISMATCH(HttpStatus.UNAUTHORIZED, "Google token audience mismatch"),
     GOOGLE_EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "Google email is not verified"),
+    GOOGLE_PLAY_NOT_CONFIGURED(HttpStatus.INTERNAL_SERVER_ERROR, "Google Play billing is not configured"),
+    GOOGLE_PLAY_PURCHASE_INVALID(HttpStatus.BAD_REQUEST, "Google Play purchase is invalid"),
+    GOOGLE_PLAY_PURCHASE_VERIFICATION_FAILED(HttpStatus.BAD_GATEWAY, "Failed to verify Google Play purchase"),
 
     INVALID_KAKAO_USER_RESPONSE(HttpStatus.UNAUTHORIZED, "Invalid kakao user response"),
     KAKAO_EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "Kakao account email must be available and verified"),

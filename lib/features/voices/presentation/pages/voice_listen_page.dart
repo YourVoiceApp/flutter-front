@@ -1,3 +1,7 @@
+<<<<<<< Updated upstream
+=======
+import 'package:audioplayers/audioplayers.dart';
+>>>>>>> Stashed changes
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -5,6 +9,10 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
+<<<<<<< Updated upstream
+=======
+import '../../data/voice_library_repository.dart';
+>>>>>>> Stashed changes
 import '../../domain/voice_folder.dart';
 import '../../domain/voice_job.dart';
 
@@ -418,7 +426,11 @@ class _VoiceListenPageState extends State<VoiceListenPage> {
                   const SizedBox(height: 20),
                   if (_selected != null &&
                       _selected!.status == VoiceJobStatus.completed)
+<<<<<<< Updated upstream
                     _ListenComposer(voiceLabel: _selected!.fileName)
+=======
+                    _ListenComposer(voice: _selected!)
+>>>>>>> Stashed changes
                   else if (_selected != null)
                     _ListenNotReadyHint(status: _selected!.status),
                 ],
@@ -464,9 +476,15 @@ class _ListenNotReadyHint extends StatelessWidget {
 }
 
 class _ListenComposer extends StatefulWidget {
+<<<<<<< Updated upstream
   const _ListenComposer({required this.voiceLabel});
 
   final String voiceLabel;
+=======
+  const _ListenComposer({required this.voice});
+
+  final VoiceJob voice;
+>>>>>>> Stashed changes
 
   @override
   State<_ListenComposer> createState() => _ListenComposerState();
@@ -474,12 +492,22 @@ class _ListenComposer extends StatefulWidget {
 
 class _ListenComposerState extends State<_ListenComposer> {
   late final TextEditingController _textCtrl;
+<<<<<<< Updated upstream
   final FlutterTts _tts = FlutterTts();
+=======
+  final VoiceLibraryRepository _voiceRepository = VoiceLibraryRepository();
+  final FlutterTts _tts = FlutterTts();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+>>>>>>> Stashed changes
   final SpeechToText _speech = SpeechToText();
 
   bool _ttsReady = false;
   bool _speechReady = false;
   bool _speaking = false;
+<<<<<<< Updated upstream
+=======
+  bool _synthesizing = false;
+>>>>>>> Stashed changes
   bool _listening = false;
   String _anchorBeforeMic = '';
   String _speechLocaleId = 'ko_KR';
@@ -490,6 +518,12 @@ class _ListenComposerState extends State<_ListenComposer> {
     _textCtrl = TextEditingController();
     _initTts();
     _initSpeech();
+<<<<<<< Updated upstream
+=======
+    _audioPlayer.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _speaking = false);
+    });
+>>>>>>> Stashed changes
   }
 
   Future<void> _initTts() async {
@@ -595,12 +629,39 @@ class _ListenComposerState extends State<_ListenComposer> {
     await _speech.stop();
     if (mounted) setState(() => _listening = false);
     await _tts.stop();
+<<<<<<< Updated upstream
     if (mounted) setState(() => _speaking = true);
     try {
       await _tts.speak(t);
     } catch (_) {
       if (mounted) {
         setState(() => _speaking = false);
+=======
+    await _audioPlayer.stop();
+    if (mounted) setState(() => _speaking = true);
+    try {
+      if (widget.voice.ownershipId != null) {
+        setState(() => _synthesizing = true);
+        final result = await _voiceRepository.synthesizeSpeech(
+          job: widget.voice,
+          text: t,
+        );
+        final bytes = await _voiceRepository.fetchGeneratedAudioBytes(
+          result.generatedAudioId,
+        );
+        await _audioPlayer.play(BytesSource(bytes));
+        if (mounted) setState(() => _synthesizing = false);
+        return;
+      }
+
+      await _tts.speak(t);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _speaking = false;
+          _synthesizing = false;
+        });
+>>>>>>> Stashed changes
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('재생을 시작할 수 없어요.')),
         );
@@ -610,12 +671,20 @@ class _ListenComposerState extends State<_ListenComposer> {
 
   Future<void> _stop() async {
     await _tts.stop();
+<<<<<<< Updated upstream
+=======
+    await _audioPlayer.stop();
+>>>>>>> Stashed changes
     if (mounted) setState(() => _speaking = false);
   }
 
   @override
   void dispose() {
     _tts.stop();
+<<<<<<< Updated upstream
+=======
+    _audioPlayer.dispose();
+>>>>>>> Stashed changes
     _speech.stop();
     _textCtrl.dispose();
     super.dispose();
@@ -678,7 +747,13 @@ class _ListenComposerState extends State<_ListenComposer> {
           ),
         const SizedBox(height: 8),
         Text(
+<<<<<<< Updated upstream
           '「${widget.voiceLabel}」음색은 기기 TTS로 재생돼요. (연결 시 실제 모델로)',
+=======
+          widget.voice.ownershipId != null
+              ? '「${widget.voice.fileName}」 음성으로 서버 TTS를 요청해 재생합니다.'
+              : '「${widget.voice.fileName}」은 기기 TTS로 재생돼요. (게스트/로컬 데이터)',
+>>>>>>> Stashed changes
           style: TextStyle(
             fontSize: 11,
             color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.9),
@@ -689,7 +764,16 @@ class _ListenComposerState extends State<_ListenComposer> {
           children: [
             Expanded(
               child: FilledButton(
+<<<<<<< Updated upstream
                 onPressed: (!_ttsReady || _speaking) ? null : _speak,
+=======
+                onPressed:
+                    ((!_ttsReady && widget.voice.ownershipId == null) ||
+                        _speaking ||
+                        _synthesizing)
+                    ? null
+                    : _speak,
+>>>>>>> Stashed changes
                 style: FilledButton.styleFrom(
                   backgroundColor: YeolpumtaTheme.accent,
                   foregroundColor: Colors.white,
@@ -698,7 +782,11 @@ class _ListenComposerState extends State<_ListenComposer> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
+<<<<<<< Updated upstream
                 child: Text(_speaking ? '재생 중…' : '듣기'),
+=======
+                child: Text(_synthesizing ? '생성 중…' : (_speaking ? '재생 중…' : '듣기')),
+>>>>>>> Stashed changes
               ),
             ),
             const SizedBox(width: 10),

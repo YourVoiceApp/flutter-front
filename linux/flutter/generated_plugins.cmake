@@ -3,6 +3,10 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+<<<<<<< Updated upstream
+=======
+  audioplayers_linux
+>>>>>>> Stashed changes
   flutter_secure_storage_linux
 )
 

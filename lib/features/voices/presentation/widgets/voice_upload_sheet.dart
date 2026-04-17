@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+<<<<<<< Updated upstream
 import 'package:uuid/uuid.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
@@ -7,6 +8,14 @@ import '../../domain/voice_folder.dart';
 import '../../domain/voice_job.dart';
 
 /// 파일 선택 + 폴더 지정(새 폴더 추가 가능) → [VoiceJob] 반환
+=======
+
+import '../../../../app/theme/yeolpumta_theme.dart';
+import '../../domain/voice_folder.dart';
+import '../../domain/voice_upload_request.dart';
+
+/// 파일 선택 + 폴더 지정(새 폴더 추가 가능) → [VoiceUploadRequest] 반환
+>>>>>>> Stashed changes
 class VoiceUploadSheet extends StatefulWidget {
   const VoiceUploadSheet({
     super.key,
@@ -19,6 +28,10 @@ class VoiceUploadSheet extends StatefulWidget {
 
   /// 폴더 화면에서 올릴 때 미리 선택
   final String? initialFolderId;
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
   /// 새 폴더 id 반환 (저장 후)
   final Future<String> Function(String name) onCreateFolder;
 
@@ -27,10 +40,16 @@ class VoiceUploadSheet extends StatefulWidget {
 }
 
 class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
+<<<<<<< Updated upstream
   String? _pickedName;
   late String _folderId;
   final _newFolderCtrl = TextEditingController();
   final _uuid = const Uuid();
+=======
+  PlatformFile? _pickedFile;
+  late String _folderId;
+  final _newFolderCtrl = TextEditingController();
+>>>>>>> Stashed changes
   bool _busy = false;
 
   @override
@@ -41,8 +60,12 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
 
   String _initialOrDefault() {
     final initial = widget.initialFolderId;
+<<<<<<< Updated upstream
     if (initial != null &&
         widget.folders.any((f) => f.id == initial)) {
+=======
+    if (initial != null && widget.folders.any((f) => f.id == initial)) {
+>>>>>>> Stashed changes
       return initial;
     }
     try {
@@ -84,6 +107,7 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
 
   Future<void> _pickFile() async {
     final r = await FilePicker.platform.pickFiles(
+<<<<<<< Updated upstream
       type: FileType.any,
       withData: false,
     );
@@ -91,14 +115,30 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
     final name = r.files.single.name;
     if (name.isEmpty) return;
     setState(() => _pickedName = name);
+=======
+      type: FileType.custom,
+      allowedExtensions: const ['wav', 'mp3'],
+      withData: true,
+    );
+    if (r == null || r.files.isEmpty) return;
+    final file = r.files.single;
+    if (file.name.isEmpty || file.bytes == null) return;
+    setState(() => _pickedFile = file);
+>>>>>>> Stashed changes
   }
 
   Future<void> _submitNewFolder() async {
     final name = _newFolderCtrl.text;
     if (name.trim().isEmpty) {
+<<<<<<< Updated upstream
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('폴더 이름을 입력해 주세요.')),
       );
+=======
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('폴더 이름을 입력해 주세요.')));
+>>>>>>> Stashed changes
       return;
     }
     setState(() => _busy = true);
@@ -113,14 +153,21 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
     } catch (e) {
       if (mounted) {
         setState(() => _busy = false);
+<<<<<<< Updated upstream
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('$e')),
         );
+=======
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+>>>>>>> Stashed changes
       }
     }
   }
 
   void _confirm() {
+<<<<<<< Updated upstream
     if (_pickedName == null) return;
     final job = VoiceJob(
       id: 'job-${_uuid.v4()}',
@@ -131,6 +178,17 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
       origin: VoiceOrigin.uploaded,
     );
     Navigator.of(context).pop<VoiceJob>(job);
+=======
+    final pickedFile = _pickedFile;
+    if (pickedFile == null || pickedFile.bytes == null) return;
+    final request = VoiceUploadRequest(
+      filename: pickedFile.name,
+      bytes: pickedFile.bytes!,
+      folderId: _folderId,
+      name: pickedFile.name.split('.').first,
+    );
+    Navigator.of(context).pop<VoiceUploadRequest>(request);
+>>>>>>> Stashed changes
   }
 
   @override
@@ -187,7 +245,11 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
             OutlinedButton.icon(
               onPressed: _pickFile,
               icon: const Icon(Icons.audio_file_outlined),
+<<<<<<< Updated upstream
               label: Text(_pickedName ?? '파일 선택'),
+=======
+              label: Text(_pickedFile?.name ?? '파일 선택 (.wav / .mp3)'),
+>>>>>>> Stashed changes
               style: OutlinedButton.styleFrom(
                 foregroundColor: YeolpumtaTheme.textPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -252,6 +314,7 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
                       fillColor: YeolpumtaTheme.bg,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+<<<<<<< Updated upstream
                         borderSide:
                             const BorderSide(color: YeolpumtaTheme.divider),
                       ),
@@ -259,6 +322,17 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide:
                             const BorderSide(color: YeolpumtaTheme.divider),
+=======
+                        borderSide: const BorderSide(
+                          color: YeolpumtaTheme.divider,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: YeolpumtaTheme.divider,
+                        ),
+>>>>>>> Stashed changes
                       ),
                       isDense: true,
                     ),
@@ -274,7 +348,11 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
             ),
             const SizedBox(height: 24),
             FilledButton(
+<<<<<<< Updated upstream
               onPressed: _pickedName == null ? null : _confirm,
+=======
+              onPressed: _pickedFile == null ? null : _confirm,
+>>>>>>> Stashed changes
               style: FilledButton.styleFrom(
                 backgroundColor: YeolpumtaTheme.accent,
                 foregroundColor: Colors.white,

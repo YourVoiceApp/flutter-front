@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/presentation/widgets/common_widgets.dart';
+<<<<<<< Updated upstream
 import '../room_demo_data.dart';
+=======
+import '../../data/room_repository.dart';
+import '../../domain/room.dart';
+>>>>>>> Stashed changes
 import 'room_create_page.dart';
 import 'room_detail_page.dart';
 import 'room_join_page.dart';
@@ -18,15 +23,37 @@ class RoomHubPage extends StatefulWidget {
 }
 
 class _RoomHubPageState extends State<RoomHubPage> {
+<<<<<<< Updated upstream
   late List<RoomDemo> _rooms;
+=======
+  final _roomRepository = RoomRepository();
+  List<Room> _rooms = const [];
+  bool _loading = true;
+>>>>>>> Stashed changes
 
   @override
   void initState() {
     super.initState();
+<<<<<<< Updated upstream
     _rooms = List<RoomDemo>.from(kMockJoinedRooms);
   }
 
   void _openRoom(RoomDemo room) {
+=======
+    _loadRooms();
+  }
+
+  Future<void> _loadRooms() async {
+    final rooms = await _roomRepository.loadRooms();
+    if (!mounted) return;
+    setState(() {
+      _rooms = rooms;
+      _loading = false;
+    });
+  }
+
+  void _openRoom(Room room) {
+>>>>>>> Stashed changes
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => RoomDetailPage(
@@ -42,6 +69,24 @@ class _RoomHubPageState extends State<RoomHubPage> {
     );
   }
 
+<<<<<<< Updated upstream
+=======
+  Future<void> _openJoinFlow() async {
+    final navigator = Navigator.of(context);
+    final joined = await navigator.push<Room>(
+      MaterialPageRoute(
+        builder: (_) =>
+            RoomJoinPage(existingCodes: {for (final r in _rooms) r.inviteCode}),
+      ),
+    );
+    if (!mounted || joined == null) return;
+    if (_rooms.every((r) => r.id != joined.id)) {
+      setState(() => _rooms = [joined, ..._rooms]);
+    }
+    _openRoom(joined);
+  }
+
+>>>>>>> Stashed changes
   @override
   Widget build(BuildContext context) {
     final bg = widget.embeddedInMainShell
@@ -53,9 +98,13 @@ class _RoomHubPageState extends State<RoomHubPage> {
       backgroundColor: bg,
       appBar: widget.embeddedInMainShell
           ? null
+<<<<<<< Updated upstream
           : AppBar(
               title: const Text('가족 · 공유 방'),
             ),
+=======
+          : AppBar(title: const Text('가족 · 공유 방')),
+>>>>>>> Stashed changes
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad),
         children: [
@@ -63,7 +112,13 @@ class _RoomHubPageState extends State<RoomHubPage> {
           const SizedBox(height: 20),
           sectionTitle('참여 중인 방'),
           const SizedBox(height: 10),
+<<<<<<< Updated upstream
           if (_rooms.isEmpty)
+=======
+          if (_loading)
+            const WhiteCard(child: Center(child: CircularProgressIndicator()))
+          else if (_rooms.isEmpty)
+>>>>>>> Stashed changes
             const WhiteCard(
               child: Text(
                 '아직 방이 없어요. 아래에서 만들거나 입장해 보세요.',
@@ -74,10 +129,14 @@ class _RoomHubPageState extends State<RoomHubPage> {
             ..._rooms.map(
               (r) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
+<<<<<<< Updated upstream
                 child: _RoomEntryTile(
                   room: r,
                   onTap: () => _openRoom(r),
                 ),
+=======
+                child: _RoomEntryTile(room: r, onTap: () => _openRoom(r)),
+>>>>>>> Stashed changes
               ),
             ),
           const SizedBox(height: 16),
@@ -86,10 +145,15 @@ class _RoomHubPageState extends State<RoomHubPage> {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () async {
+<<<<<<< Updated upstream
                     final created = await Navigator.of(context).push<RoomDemo>(
                       MaterialPageRoute(
                         builder: (_) => const RoomCreatePage(),
                       ),
+=======
+                    final created = await Navigator.of(context).push<Room>(
+                      MaterialPageRoute(builder: (_) => const RoomCreatePage()),
+>>>>>>> Stashed changes
                     );
                     if (!context.mounted || created == null) return;
                     setState(() => _rooms = [created, ..._rooms]);
@@ -107,6 +171,7 @@ class _RoomHubPageState extends State<RoomHubPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
+<<<<<<< Updated upstream
                   onPressed: () async {
                     final joined = await Navigator.of(context).push<RoomDemo>(
                       MaterialPageRoute(
@@ -121,6 +186,9 @@ class _RoomHubPageState extends State<RoomHubPage> {
                     }
                     _openRoom(joined);
                   },
+=======
+                  onPressed: _openJoinFlow,
+>>>>>>> Stashed changes
                   icon: const Icon(Icons.login_rounded),
                   label: const Text('입장하기'),
                   style: OutlinedButton.styleFrom(
@@ -191,11 +259,15 @@ Widget _heroCard(BuildContext context) {
         const SizedBox(height: 12),
         const Text(
           '방장이 방을 만들면 초대 코드가 생기고, 비밀번호를 켜 두면 코드 + 암호로만 들어올 수 있어요. (지금은 화면만 연결됨)',
+<<<<<<< Updated upstream
           style: TextStyle(
             color: Color(0xFF9A3412),
             fontSize: 13,
             height: 1.4,
           ),
+=======
+          style: TextStyle(color: Color(0xFF9A3412), fontSize: 13, height: 1.4),
+>>>>>>> Stashed changes
         ),
       ],
     ),
@@ -205,7 +277,11 @@ Widget _heroCard(BuildContext context) {
 class _RoomEntryTile extends StatelessWidget {
   const _RoomEntryTile({required this.room, required this.onTap});
 
+<<<<<<< Updated upstream
   final RoomDemo room;
+=======
+  final Room room;
+>>>>>>> Stashed changes
   final VoidCallback onTap;
 
   @override
@@ -253,12 +329,24 @@ class _RoomEntryTile extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
+<<<<<<< Updated upstream
                     if (room.requirePassword)
+=======
+                    if (room.requiresPassword)
+>>>>>>> Stashed changes
                       const Padding(
                         padding: EdgeInsets.only(top: 6),
                         child: Row(
                           children: [
+<<<<<<< Updated upstream
                             Icon(Icons.lock_outline_rounded, size: 14, color: Color(0xFFEA580C)),
+=======
+                            Icon(
+                              Icons.lock_outline_rounded,
+                              size: 14,
+                              color: Color(0xFFEA580C),
+                            ),
+>>>>>>> Stashed changes
                             SizedBox(width: 4),
                             Text(
                               '비밀번호 필요',

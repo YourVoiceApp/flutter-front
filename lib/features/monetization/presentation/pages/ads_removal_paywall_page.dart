@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
+<<<<<<< Updated upstream
+=======
+import '../../../auth/data/auth_api_client.dart';
+>>>>>>> Stashed changes
 import '../../data/premium_repository.dart';
 
 /// 듣기 구간 광고 제거 — 2,900원 (UI·로컬 데모)
@@ -30,6 +34,7 @@ class _AdsRemovalPaywallPageState extends State<AdsRemovalPaywallPage> {
 
   Future<void> _purchaseDemo() async {
     setState(() => _busy = true);
+<<<<<<< Updated upstream
     await Future<void>.delayed(const Duration(milliseconds: 400));
     await widget.repository.setAdsRemoved(true);
     if (!mounted) return;
@@ -41,15 +46,47 @@ class _AdsRemovalPaywallPageState extends State<AdsRemovalPaywallPage> {
       const SnackBar(content: Text('광고 제거가 적용됐어요. (데모 · 실제 결제는 스토어 연동 후)')),
     );
     Navigator.of(context).pop<bool>(true);
+=======
+    try {
+      await widget.repository.purchaseAdsRemoval(
+        purchaseToken: 'dev-${DateTime.now().millisecondsSinceEpoch}',
+      );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _already = true;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('광고 제거가 적용됐어요.')));
+      Navigator.of(context).pop<bool>(true);
+    } on AuthApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('구매 처리 중 오류가 발생했어요: $e')));
+    }
+>>>>>>> Stashed changes
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: YeolpumtaTheme.bg,
+<<<<<<< Updated upstream
       appBar: AppBar(
         title: const Text('광고 제거'),
       ),
+=======
+      appBar: AppBar(title: const Text('광고 제거')),
+>>>>>>> Stashed changes
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
@@ -153,7 +190,11 @@ class _AdsRemovalPaywallPageState extends State<AdsRemovalPaywallPage> {
           ),
           const SizedBox(height: 16),
           Text(
+<<<<<<< Updated upstream
             '실제 서비스에서는 앱스토어 / 플레이 인앱결제로 연결하고, 영수증 검증 후 광고를 끕니다.',
+=======
+            '현재는 백엔드 주문/확인 API에 연결돼 있고, 실제 서비스에서는 스토어 결제 토큰을 넘기도록 확장하면 됩니다.',
+>>>>>>> Stashed changes
             style: TextStyle(
               fontSize: 12,
               height: 1.4,

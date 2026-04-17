@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/presentation/widgets/common_widgets.dart';
+<<<<<<< Updated upstream
 import '../room_demo_data.dart';
 import '../widgets/shared_voice_play_sheet.dart';
 
 typedef RoomUpdated = void Function(RoomDemo room);
+=======
+import '../../data/room_repository.dart';
+import '../../domain/room.dart';
+import '../../../voices/domain/voice_job.dart';
+import '../widgets/shared_voice_play_sheet.dart';
+
+typedef RoomUpdated = void Function(Room room);
+>>>>>>> Stashed changes
 
 /// 방 안: 멤버 · 공유 음성 · 내 음성 올리기 (UI)
 class RoomDetailPage extends StatefulWidget {
@@ -14,7 +23,11 @@ class RoomDetailPage extends StatefulWidget {
     this.onRoomUpdated,
   });
 
+<<<<<<< Updated upstream
   final RoomDemo initialRoom;
+=======
+  final Room initialRoom;
+>>>>>>> Stashed changes
   final RoomUpdated? onRoomUpdated;
 
   @override
@@ -22,22 +35,56 @@ class RoomDetailPage extends StatefulWidget {
 }
 
 class _RoomDetailPageState extends State<RoomDetailPage> {
+<<<<<<< Updated upstream
   late RoomDemo _room;
+=======
+  final _roomRepository = RoomRepository();
+  late Room _room;
+  List<VoiceJob> _myVoices = const [];
+  bool _loading = true;
+>>>>>>> Stashed changes
 
   @override
   void initState() {
     super.initState();
     _room = widget.initialRoom;
+<<<<<<< Updated upstream
+=======
+    _load();
+>>>>>>> Stashed changes
   }
 
   void _notifyParent() {
     widget.onRoomUpdated?.call(_room);
   }
 
+<<<<<<< Updated upstream
   void _shareVoiceSheet() {
     final chosen = <String>{
       for (final v in _room.sharedVoices)
         if (kMockMyVoicesForShare.any((m) => m.id == v.id)) v.id,
+=======
+  Future<void> _load() async {
+    try {
+      final detail = await _roomRepository.loadRoomDetail(_room);
+      final myVoices = await _roomRepository.loadSharableVoices();
+      if (!mounted) return;
+      setState(() {
+        _room = detail;
+        _myVoices = myVoices;
+        _loading = false;
+      });
+      _notifyParent();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  void _shareVoiceSheet() {
+    final chosen = <String>{
+      for (final v in _room.sharedVoices) v.externalVoiceId,
+>>>>>>> Stashed changes
     };
 
     showModalBottomSheet<void>(
@@ -82,14 +129,22 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                   ),
                   const SizedBox(height: 6),
                   const Text(
+<<<<<<< Updated upstream
                     '학습이 끝난 목소리 중 이 방에서 쓰도록 허용할 항목을 고르세요. (데모)',
+=======
+                    '학습이 끝난 목소리 중 이 방에서 쓰도록 허용할 항목을 고르세요.',
+>>>>>>> Stashed changes
                     style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
                     height: 280,
                     child: ListView(
+<<<<<<< Updated upstream
                       children: kMockMyVoicesForShare.map((v) {
+=======
+                      children: _myVoices.map((v) {
+>>>>>>> Stashed changes
                         final on = chosen.contains(v.id);
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
@@ -105,10 +160,19 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                               });
                             },
                             title: Text(
+<<<<<<< Updated upstream
                               v.voiceTitle,
                               style: const TextStyle(fontWeight: FontWeight.w700),
                             ),
                             subtitle: Text(v.subtitle ?? ''),
+=======
+                              v.fileName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(v.origin.label),
+>>>>>>> Stashed changes
                             secondary: const CircleAvatar(
                               backgroundColor: Color(0xFFEAF0FF),
                               child: Icon(
@@ -124,6 +188,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                   ),
                   const SizedBox(height: 12),
                   FilledButton(
+<<<<<<< Updated upstream
                     onPressed: () {
                       final others = _room.sharedVoices
                           .where(
@@ -144,6 +209,27 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       _notifyParent();
                       Navigator.pop(ctx);
                       showToast(context, '이 방에 공유 목록을 반영했어요. (UI 데모)');
+=======
+                    onPressed: () async {
+                      final navigator = Navigator.of(ctx);
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        final updated = await _roomRepository.syncSharedVoices(
+                          room: _room,
+                          selectedVoiceIds: chosen,
+                        );
+                        if (!mounted) return;
+                        setState(() => _room = updated);
+                        _notifyParent();
+                        navigator.pop();
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('이 방에 공유 목록을 반영했어요.')),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        messenger.showSnackBar(SnackBar(content: Text('$e')));
+                      }
+>>>>>>> Stashed changes
                     },
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFE07C4C),
@@ -188,7 +274,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       ),
                       const SizedBox(height: 12),
                       Text(
+<<<<<<< Updated upstream
                         _room.requirePassword
+=======
+                        _room.requiresPassword
+>>>>>>> Stashed changes
                             ? '비밀번호가 켜진 방이에요. 코드와 함께 암호를 전달하세요.'
                             : '코드만 알면 입장할 수 있어요.',
                         style: const TextStyle(color: Color(0xFF64748B)),
@@ -211,6 +301,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
         children: [
+<<<<<<< Updated upstream
+=======
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: WhiteCard(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ),
+>>>>>>> Stashed changes
           WhiteCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,7 +340,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       label: const Text('초대'),
                       backgroundColor: const Color(0xFFFFF4E6),
                       onPressed: () =>
+<<<<<<< Updated upstream
                           showToast(context, '초대장 보내기 (데모)'),
+=======
+                          showToast(context, '초대 코드 입장 API는 아직 문서에 없습니다.'),
+>>>>>>> Stashed changes
                     ),
                   ],
                 ),

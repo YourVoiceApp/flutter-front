@@ -11,9 +11,15 @@ class AuthService {
     AuthApiClient? apiClient,
     AuthSessionStore? sessionStore,
     UserProfileRepository? profileRepository,
+<<<<<<< Updated upstream
   })  : _api = apiClient ?? AuthApiClient(),
         _sessions = sessionStore ?? AuthSessionStore(),
         _profiles = profileRepository ?? UserProfileRepository();
+=======
+  }) : _api = apiClient ?? AuthApiClient(),
+       _sessions = sessionStore ?? AuthSessionStore(),
+       _profiles = profileRepository ?? UserProfileRepository();
+>>>>>>> Stashed changes
 
   final AuthApiClient _api;
   final AuthSessionStore _sessions;
@@ -38,6 +44,7 @@ class AuthService {
     );
   }
 
+<<<<<<< Updated upstream
   Future<void> sendEmailVerification({
     required String email,
   }) {
@@ -52,6 +59,14 @@ class AuthService {
       email: email,
       code: code,
     );
+=======
+  Future<void> sendEmailVerification({required String email}) {
+    return _api.sendEmailVerification(email: email);
+  }
+
+  Future<void> verifyEmailCode({required String email, required String code}) {
+    return _api.verifyEmailCode(email: email, code: code);
+>>>>>>> Stashed changes
   }
 
   Future<AuthUser> signInWithEmail({
@@ -139,10 +154,14 @@ class AuthService {
 
   Future<AuthUser> updateNickname(String nickName) async {
     final user = await _authorized(
+<<<<<<< Updated upstream
       (accessToken) => _api.updateProfile(
         accessToken,
         nickName: nickName,
       ),
+=======
+      (accessToken) => _api.updateProfile(accessToken, nickName: nickName),
+>>>>>>> Stashed changes
     );
     await _cacheUser(user);
     return user;
@@ -178,6 +197,26 @@ class AuthService {
     return _profiles.loadProfile();
   }
 
+<<<<<<< Updated upstream
+=======
+  Future<bool> hasStoredSession() async {
+    final refreshToken = await _sessions.readRefreshToken();
+    return refreshToken != null && refreshToken.isNotEmpty;
+  }
+
+  Future<T> authorizedRequest<T>(
+    Future<T> Function(String accessToken) action,
+  ) {
+    return _authorized(action);
+  }
+
+  Future<void> authorizedRequestVoid(
+    Future<void> Function(String accessToken) action,
+  ) {
+    return _authorizedVoid(action);
+  }
+
+>>>>>>> Stashed changes
   Future<void> clearLocalSession() async {
     await _sessions.clear();
     await _profiles.clear();

@@ -5,6 +5,10 @@
 import FlutterMacOS
 import Foundation
 
+<<<<<<< Updated upstream
+=======
+import audioplayers_darwin
+>>>>>>> Stashed changes
 import file_picker
 import flutter_secure_storage_darwin
 import flutter_tts
@@ -13,6 +17,10 @@ import shared_preferences_foundation
 import speech_to_text
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
+<<<<<<< Updated upstream
+=======
+  AudioplayersDarwinPlugin.register(with: registry.registrar(forPlugin: "AudioplayersDarwinPlugin"))
+>>>>>>> Stashed changes
   FilePickerPlugin.register(with: registry.registrar(forPlugin: "FilePickerPlugin"))
   FlutterSecureStorageDarwinPlugin.register(with: registry.registrar(forPlugin: "FlutterSecureStorageDarwinPlugin"))
   FlutterTtsPlugin.register(with: registry.registrar(forPlugin: "FlutterTtsPlugin"))

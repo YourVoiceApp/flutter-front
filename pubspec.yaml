@@ -20,6 +20,10 @@ dependencies:
   http: ^1.6.0
   kakao_flutter_sdk_user: ^2.0.0+1
   flutter_secure_storage: ^10.0.0
+<<<<<<< Updated upstream
+=======
+  audioplayers: ^6.6.0
+>>>>>>> Stashed changes
 
 dev_dependencies:
   flutter_test:

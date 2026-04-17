@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/presentation/widgets/common_widgets.dart';
+<<<<<<< Updated upstream
 import '../room_demo_data.dart';
 
 /// 방 개설 (초대 코드 생성 · 비밀번호 선택) — UI만
+=======
+import '../../data/room_repository.dart';
+import '../../domain/room.dart';
+
+/// 방 개설
+>>>>>>> Stashed changes
 class RoomCreatePage extends StatefulWidget {
   const RoomCreatePage({super.key});
 
@@ -14,7 +21,13 @@ class RoomCreatePage extends StatefulWidget {
 class _RoomCreatePageState extends State<RoomCreatePage> {
   final _nameCtrl = TextEditingController(text: '우리 가족 방');
   final _passCtrl = TextEditingController();
+<<<<<<< Updated upstream
   bool _usePassword = false;
+=======
+  final _roomRepository = RoomRepository();
+  bool _usePassword = false;
+  bool _busy = false;
+>>>>>>> Stashed changes
 
   @override
   void dispose() {
@@ -23,12 +36,16 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
     super.dispose();
   }
 
+<<<<<<< Updated upstream
   String _genInviteCode() {
     final x = DateTime.now().millisecondsSinceEpoch % 0x10000;
     return 'FAM-${x.toRadixString(16).toUpperCase().padLeft(4, '0')}';
   }
 
   void _create() {
+=======
+  Future<void> _create() async {
+>>>>>>> Stashed changes
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
       showToast(context, '방 이름을 입력해 주세요.');
@@ -39,6 +56,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
       return;
     }
 
+<<<<<<< Updated upstream
     final room = RoomDemo(
       id: 'new-${DateTime.now().millisecondsSinceEpoch}',
       name: name,
@@ -50,15 +68,38 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
 
     showToast(context, '방이 만들어졌어요. 초대 코드를 공유해 보세요. (UI 데모)');
     Navigator.of(context).pop<RoomDemo>(room);
+=======
+    setState(() => _busy = true);
+    try {
+      final room = await _roomRepository.createRoom(
+        title: name,
+        usePassword: _usePassword,
+        password: _passCtrl.text.trim(),
+        maxParticipants: 3,
+      );
+      if (!mounted) return;
+      showToast(context, '방이 만들어졌어요. 초대 코드를 공유해 보세요.');
+      Navigator.of(context).pop<Room>(room);
+    } catch (e) {
+      if (!mounted) return;
+      showToast(context, '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+>>>>>>> Stashed changes
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FF),
+<<<<<<< Updated upstream
       appBar: AppBar(
         title: const Text('방 만들기'),
       ),
+=======
+      appBar: AppBar(title: const Text('방 만들기')),
+>>>>>>> Stashed changes
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -106,12 +147,29 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
           ),
           const SizedBox(height: 16),
           FilledButton(
+<<<<<<< Updated upstream
             onPressed: _create,
+=======
+            onPressed: _busy ? null : _create,
+>>>>>>> Stashed changes
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFE07C4C),
               minimumSize: const Size.fromHeight(52),
             ),
+<<<<<<< Updated upstream
             child: const Text('방 만들기'),
+=======
+            child: _busy
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text('방 만들기'),
+>>>>>>> Stashed changes
           ),
         ],
       ),

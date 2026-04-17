@@ -13,6 +13,10 @@ import '../../../rooms/presentation/pages/room_hub_page.dart';
 import '../../../shared/presentation/pages/placeholder_page.dart';
 import '../../../voices/data/voice_library_repository.dart';
 import '../../../voices/domain/voice_job.dart';
+<<<<<<< Updated upstream
+=======
+import '../../../voices/domain/voice_upload_request.dart';
+>>>>>>> Stashed changes
 import '../../../voices/presentation/pages/voice_listen_page.dart';
 import '../../../voices/presentation/pages/voice_pipeline_page.dart';
 import '../../../voices/presentation/widgets/voice_folder_manage_sheet.dart';
@@ -76,7 +80,11 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
   }
 
   Future<void> _openUpload([String? initialFolderId]) async {
+<<<<<<< Updated upstream
     final job = await showModalBottomSheet<VoiceJob?>(
+=======
+    final upload = await showModalBottomSheet<VoiceUploadRequest?>(
+>>>>>>> Stashed changes
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -90,6 +98,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
         onCreateFolder: _createFolderForUpload,
       ),
     );
+<<<<<<< Updated upstream
     if (job == null || !mounted) return;
     final next = await _repo.addJob(_data, job);
     if (!mounted) return;
@@ -97,6 +106,20 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('올렸어요. 학습은 「다음 단계」로 옮겨 볼 수 있어요.')),
     );
+=======
+    if (upload == null || !mounted) return;
+    try {
+      final next = await _repo.uploadVoice(_data, upload);
+      if (!mounted) return;
+      setState(() => _data = next);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('음성을 업로드했어요.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+>>>>>>> Stashed changes
   }
 
   Future<void> _openFolderManage() async {
@@ -143,6 +166,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
   }
 
   Future<void> _deleteJob(String id) async {
+<<<<<<< Updated upstream
     final snap = await _repo.deleteJob(_data, id);
     if (!mounted) return;
     setState(() => _data = snap);
@@ -152,6 +176,27 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     final snap = await _repo.moveJobToFolder(_data, jobId, folderId);
     if (!mounted) return;
     setState(() => _data = snap);
+=======
+    try {
+      final snap = await _repo.deleteJob(_data, id);
+      if (!mounted) return;
+      setState(() => _data = snap);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _moveJob(String jobId, String folderId) async {
+    try {
+      final snap = await _repo.moveJobToFolder(_data, jobId, folderId);
+      if (!mounted) return;
+      setState(() => _data = snap);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+>>>>>>> Stashed changes
   }
 
   void _openListen(VoiceJob job) {

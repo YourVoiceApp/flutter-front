@@ -80,6 +80,13 @@ class AuthenticatedApiClient {
     return _sendJsonObject('PUT', _uri(path), body: body);
   }
 
+  Future<Map<String, dynamic>> patchJsonObject(
+    String path, {
+    Map<String, dynamic>? body,
+  }) {
+    return _sendJsonObject('PATCH', _uri(path), body: body);
+  }
+
   Future<List<dynamic>> patchJsonList(
     String path, {
     Map<String, dynamic>? body,

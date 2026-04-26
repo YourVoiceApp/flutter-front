@@ -66,14 +66,28 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     });
   }
 
+  Future<void> _refreshVoiceFolderScope([String? folderId]) async {
+    final snap = await _repo.refreshFolderContents(_data, folderId: folderId);
+    if (!mounted) return;
+    setState(() => _data = snap);
+  }
+
   List<VoiceJob> get _completed =>
       _data.jobs.where((j) => j.status == VoiceJobStatus.completed).toList();
 
-  Future<String> _createFolderForUpload(String name) async {
-    final next = await _repo.createFolder(_data, name);
+  Future<String> _createFolderForUpload(
+    String name,
+    String? parentFolderId,
+  ) async {
+    final result = await _repo.createFolder(
+      _data,
+      name,
+      parentFolderId: parentFolderId,
+    );
     if (!mounted) throw StateError('unmounted');
-    setState(() => _data = next);
-    return next.folders.last.id;
+    setState(() => _data = result.snapshot);
+    await _refreshVoiceFolderScope(parentFolderId);
+    return result.folderId;
   }
 
   Future<void> _openUpload([String? initialFolderId]) async {
@@ -105,7 +119,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     }
   }
 
-  Future<void> _openFolderManage() async {
+  Future<void> _openFolderManage([String? currentFolderId]) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -116,10 +130,16 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
       ),
       builder: (ctx) => VoiceFolderManageSheet(
         folders: _data.folders,
-        onCreate: (name) async {
-          final snap = await _repo.createFolder(_data, name);
+        currentFolderId: currentFolderId,
+        onCreate: (name, parentFolderId) async {
+          final result = await _repo.createFolder(
+            _data,
+            name,
+            parentFolderId: parentFolderId,
+          );
           if (!mounted) return;
-          setState(() => _data = snap);
+          setState(() => _data = result.snapshot);
+          await _refreshVoiceFolderScope(parentFolderId);
         },
         onRename: (id, newName) async {
           final snap = await _repo.renameFolder(_data, id, newName);
@@ -432,6 +452,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
             folders: _data.folders,
             onUploadTap: _openUpload,
             onOpenFolderManage: _openFolderManage,
+            onRefreshScope: _refreshVoiceFolderScope,
             onAdvanceDemo: _advanceDemo,
             onDeleteJob: _deleteJob,
             onMoveJob: _moveJob,

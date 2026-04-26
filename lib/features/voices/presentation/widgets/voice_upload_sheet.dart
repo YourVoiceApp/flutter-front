@@ -20,7 +20,8 @@ class VoiceUploadSheet extends StatefulWidget {
   final String? initialFolderId;
 
   /// 새 폴더 id 반환 (저장 후)
-  final Future<String> Function(String name) onCreateFolder;
+  final Future<String> Function(String name, String? parentFolderId)
+  onCreateFolder;
 
   @override
   State<VoiceUploadSheet> createState() => _VoiceUploadSheetState();
@@ -102,7 +103,7 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
     }
     setState(() => _busy = true);
     try {
-      final id = await widget.onCreateFolder(name);
+      final id = await widget.onCreateFolder(name, _newFolderParentId());
       if (!mounted) return;
       _newFolderCtrl.clear();
       setState(() {
@@ -134,12 +135,7 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
-    final folders = List<VoiceFolder>.from(widget.folders)
-      ..sort((a, b) {
-        if (a.id == VoiceFolder.uncategorizedId) return -1;
-        if (b.id == VoiceFolder.uncategorizedId) return 1;
-        return a.name.compareTo(b.name);
-      });
+    final folders = _orderedFolders();
 
     return Padding(
       padding: EdgeInsets.only(
@@ -224,7 +220,7 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
                       DropdownMenuItem(
                         value: f.id,
                         child: Text(
-                          f.isUncategorized ? '${f.name} (기본)' : f.name,
+                          _folderDropdownLabel(f),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -292,5 +288,71 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
         ),
       ),
     );
+  }
+
+  String? _newFolderParentId() {
+    if (_folderId == VoiceFolder.uncategorizedId) return null;
+    return _folderId;
+  }
+
+  List<VoiceFolder> _orderedFolders() {
+    final byParent = <String?, List<VoiceFolder>>{};
+    for (final folder in widget.folders) {
+      byParent.putIfAbsent(folder.parentId, () => <VoiceFolder>[]).add(folder);
+    }
+    for (final folders in byParent.values) {
+      folders.sort((a, b) {
+        if (a.id == VoiceFolder.uncategorizedId) return -1;
+        if (b.id == VoiceFolder.uncategorizedId) return 1;
+        return a.name.compareTo(b.name);
+      });
+    }
+
+    final ordered = <VoiceFolder>[];
+    final visited = <String>{};
+
+    void visit(String? parentId) {
+      for (final folder in byParent[parentId] ?? const <VoiceFolder>[]) {
+        if (!visited.add(folder.id)) continue;
+        ordered.add(folder);
+        visit(folder.id);
+      }
+    }
+
+    visit(null);
+    for (final folder in widget.folders) {
+      if (visited.add(folder.id)) {
+        ordered.add(folder);
+      }
+    }
+    return ordered;
+  }
+
+  String _folderDropdownLabel(VoiceFolder folder) {
+    final prefix = folder.isUncategorized ? '${folder.name} (기본)' : folder.name;
+    final path = _folderPath(folder.id);
+    if (path == folder.name || folder.isUncategorized) return prefix;
+    return path;
+  }
+
+  String _folderPath(String folderId) {
+    final parts = <String>[];
+    final seen = <String>{};
+    var currentId = folderId;
+    while (seen.add(currentId)) {
+      VoiceFolder? current;
+      for (final folder in widget.folders) {
+        if (folder.id == currentId) {
+          current = folder;
+          break;
+        }
+      }
+      if (current == null) break;
+      parts.add(current.name);
+      final parentId = current.parentId;
+      if (parentId == null) break;
+      currentId = parentId;
+    }
+    return parts.reversed.join(' / ');
   }
 }

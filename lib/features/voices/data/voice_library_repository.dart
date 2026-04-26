@@ -61,6 +61,7 @@ class VoiceLibrarySnapshot {
     'id': f.id,
     'name': f.name,
     'createdAt': f.createdAt.toIso8601String(),
+    'parentId': f.parentId,
   };
 
   static VoiceFolder _folderFromJson(Map<String, dynamic> m) => VoiceFolder(
@@ -69,6 +70,7 @@ class VoiceLibrarySnapshot {
     createdAt:
         DateTime.tryParse(m['createdAt'] as String? ?? '') ??
         DateTime.fromMillisecondsSinceEpoch(0),
+    parentId: m['parentId'] as String?,
   );
 
   static Map<String, dynamic> _jobToJson(VoiceJob j) => {
@@ -119,6 +121,28 @@ class VoiceSynthesisResult {
   final String downloadUrl;
 }
 
+class VoiceFolderCreateResult {
+  const VoiceFolderCreateResult({
+    required this.snapshot,
+    required this.folderId,
+  });
+
+  final VoiceLibrarySnapshot snapshot;
+  final String folderId;
+}
+
+class VoiceFolderContents {
+  const VoiceFolderContents({
+    required this.folders,
+    required this.jobs,
+    required this.totalVoiceCount,
+  });
+
+  final List<VoiceFolder> folders;
+  final List<VoiceJob> jobs;
+  final int totalVoiceCount;
+}
+
 /// 로컬 JSON 저장 — 폴더·음성 CRUD
 class VoiceLibraryRepository {
   VoiceLibraryRepository({
@@ -167,31 +191,37 @@ class VoiceLibraryRepository {
   }
 
   Future<VoiceLibrarySnapshot> _loadRemote() async {
-    final contents = await _api.getJsonObject('/voice-folders/contents');
-    final assignedVoices = await _api.getJsonList('/voices');
-    final unassignedVoices = await _api.getJsonList('/voices/unassigned');
-
-    final folders = <VoiceFolder>[
-      VoiceFolder(
+    final foldersById = <String, VoiceFolder>{
+      VoiceFolder.uncategorizedId: VoiceFolder(
         id: VoiceFolder.uncategorizedId,
         name: '미분류',
         createdAt: DateTime.fromMillisecondsSinceEpoch(0),
       ),
-      ...((contents['folders'] as List<dynamic>? ?? const <dynamic>[])
-          .whereType<Map<String, dynamic>>()
-          .map(_remoteFolderFromJson)),
-    ];
+    };
+    final jobsById = <String, VoiceJob>{};
+    final pendingScopeIds = <String?>[null];
+    final visitedScopeKeys = <String>{};
 
-    final mergedById = <String, VoiceJob>{};
-    for (final raw in [...assignedVoices, ...unassignedVoices]) {
-      if (raw is! Map<String, dynamic>) continue;
-      final job = _remoteVoiceFromJson(raw);
-      mergedById[job.id] = job;
+    while (pendingScopeIds.isNotEmpty) {
+      final scopeId = pendingScopeIds.removeLast();
+      final scopeKey = scopeId ?? '__root__';
+      if (!visitedScopeKeys.add(scopeKey)) continue;
+
+      final contents = await _loadRemoteFolderContents(scopeId);
+      for (final folder in contents.folders) {
+        foldersById[folder.id] = folder;
+        pendingScopeIds.add(folder.id);
+      }
+      for (final job in contents.jobs) {
+        jobsById[job.id] = job;
+      }
     }
 
-    return VoiceLibrarySnapshot(
-      folders: folders,
-      jobs: mergedById.values.toList(growable: false),
+    return _ensureUncategorized(
+      VoiceLibrarySnapshot(
+        folders: foldersById.values.toList(growable: false),
+        jobs: jobsById.values.toList(growable: false),
+      ),
     );
   }
 
@@ -222,36 +252,57 @@ class VoiceLibraryRepository {
     await prefs.setString(_prefsKey, jsonEncode(snapshot.toJson()));
   }
 
-  Future<VoiceLibrarySnapshot> createFolder(
-    VoiceLibrarySnapshot current,
-    String name,
-  ) async {
-    if (await _authService.hasStoredSession()) {
-      final trimmed = name.trim();
-      if (trimmed.isEmpty) {
-        throw ArgumentError('폴더 이름이 비었어요');
-      }
-      await _api.postJsonObject(
-        '/voice-folders',
-        body: <String, dynamic>{'name': trimmed, 'parentFolderId': null},
-      );
-      return _loadRemote();
+  Future<VoiceLibrarySnapshot> refreshFolderContents(
+    VoiceLibrarySnapshot current, {
+    String? folderId,
+  }) async {
+    if (!await _authService.hasStoredSession()) {
+      return current;
     }
+    final normalizedScopeId = _normalizeParentFolderId(folderId);
+    final contents = await _loadRemoteFolderContents(normalizedScopeId);
+    return _mergeRemoteFolderContents(current, normalizedScopeId, contents);
+  }
+
+  Future<VoiceFolderCreateResult> createFolder(
+    VoiceLibrarySnapshot current,
+    String name, {
+    String? parentFolderId,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError('폴더 이름이 비었어요');
+    }
+    final normalizedParentId = _normalizeParentFolderId(parentFolderId);
+    if (await _authService.hasStoredSession()) {
+      final created = await _api.postJsonObject(
+        '/voice-folders',
+        body: <String, dynamic>{
+          'name': trimmed,
+          'parentFolderId': _serializeRemoteParentId(normalizedParentId),
+        },
+      );
+      final snapshot = await _loadRemote();
+      final folderId =
+          _usableCreatedFolderId(created) ??
+          _findCreatedFolder(snapshot, trimmed, normalizedParentId)?.id;
+      if (folderId == null || folderId.isEmpty) {
+        throw StateError('생성한 폴더 id를 찾을 수 없어요.');
+      }
+      return VoiceFolderCreateResult(snapshot: snapshot, folderId: folderId);
     }
     final folder = VoiceFolder(
       id: 'folder-${_uuid.v4()}',
       name: trimmed,
       createdAt: DateTime.now(),
+      parentId: normalizedParentId,
     );
     final next = VoiceLibrarySnapshot(
       folders: [...current.folders, folder],
       jobs: current.jobs,
     );
     await save(next);
-    return next;
+    return VoiceFolderCreateResult(snapshot: next, folderId: folder.id);
   }
 
   Future<VoiceLibrarySnapshot> renameFolder(
@@ -265,9 +316,13 @@ class VoiceLibraryRepository {
       }
       final trimmed = newName.trim();
       if (trimmed.isEmpty) throw ArgumentError('이름이 비었어요');
+      final folder = _findFolder(current, folderId);
       await _api.putJsonObject(
         '/voice-folders/$folderId',
-        body: <String, dynamic>{'name': trimmed, 'parentFolderId': null},
+        body: <String, dynamic>{
+          'name': trimmed,
+          'parentFolderId': _serializeRemoteParentId(folder.parentId),
+        },
       );
       return _loadRemote();
     }
@@ -276,7 +331,12 @@ class VoiceLibraryRepository {
     final folders = current.folders
         .map(
           (f) => f.id == folderId
-              ? VoiceFolder(id: f.id, name: trimmed, createdAt: f.createdAt)
+              ? VoiceFolder(
+                  id: f.id,
+                  name: trimmed,
+                  createdAt: f.createdAt,
+                  parentId: f.parentId,
+                )
               : f,
         )
         .toList();
@@ -290,6 +350,10 @@ class VoiceLibraryRepository {
     VoiceLibrarySnapshot current,
     String folderId,
   ) async {
+    final hasChildren = current.folders.any((f) => f.parentId == folderId);
+    if (hasChildren) {
+      throw StateError('하위 폴더가 있으면 삭제할 수 없어요');
+    }
     if (await _authService.hasStoredSession()) {
       if (folderId == VoiceFolder.uncategorizedId) {
         throw StateError('미분류 폴더는 삭제할 수 없어요');
@@ -470,15 +534,163 @@ class VoiceLibraryRepository {
     await save(next);
     return next;
   }
+
+  VoiceFolder _findFolder(VoiceLibrarySnapshot current, String folderId) {
+    for (final folder in current.folders) {
+      if (folder.id == folderId) return folder;
+    }
+    throw StateError('폴더를 찾을 수 없어요');
+  }
+
+  VoiceFolder? _findCreatedFolder(
+    VoiceLibrarySnapshot snapshot,
+    String name,
+    String? parentId,
+  ) {
+    final matches =
+        snapshot.folders
+            .where((f) => f.name == name && f.parentId == parentId)
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return matches.isEmpty ? null : matches.first;
+  }
+
+  String? _normalizeParentFolderId(String? folderId) {
+    if (folderId == null || folderId.isEmpty) return null;
+    if (folderId == VoiceFolder.uncategorizedId) return null;
+    return folderId;
+  }
+
+  Object? _serializeRemoteParentId(String? parentId) {
+    final normalized = _normalizeParentFolderId(parentId);
+    if (normalized == null) return '';
+    return normalized;
+  }
+
+  Future<VoiceFolderContents> _loadRemoteFolderContents(
+    String? folderId,
+  ) async {
+    final response = await _api.getJsonObject(
+      '/voice-folders/contents',
+      queryParameters: <String, String?>{
+        'parentId': _normalizeParentFolderId(folderId),
+      },
+    );
+    return VoiceFolderContents(
+      folders: _remoteFoldersFromJson(response['folders']),
+      jobs: (response['voices'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(_remoteVoiceFromJson)
+          .toList(growable: false),
+      totalVoiceCount: (response['totalVoiceCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  VoiceLibrarySnapshot _mergeRemoteFolderContents(
+    VoiceLibrarySnapshot current,
+    String? folderId,
+    VoiceFolderContents contents,
+  ) {
+    final foldersById = <String, VoiceFolder>{
+      for (final folder in current.folders)
+        if (folder.parentId != folderId || folder.isUncategorized)
+          folder.id: folder,
+    };
+    for (final folder in contents.folders) {
+      foldersById[folder.id] = folder;
+    }
+
+    final jobsById = <String, VoiceJob>{
+      for (final job in current.jobs)
+        if (!_jobBelongsToScope(job, folderId)) job.id: job,
+    };
+    for (final job in contents.jobs) {
+      jobsById[job.id] = job;
+    }
+
+    return _ensureUncategorized(
+      VoiceLibrarySnapshot(
+        folders: foldersById.values.toList(growable: false),
+        jobs: jobsById.values.toList(growable: false),
+      ),
+    );
+  }
+
+  bool _jobBelongsToScope(VoiceJob job, String? folderId) {
+    final normalizedScopeId = _normalizeParentFolderId(folderId);
+    if (normalizedScopeId == null) {
+      return job.folderId == VoiceFolder.uncategorizedId;
+    }
+    return job.folderId == normalizedScopeId;
+  }
 }
 
-VoiceFolder _remoteFolderFromJson(Map<String, dynamic> json) {
+List<VoiceFolder> _remoteFoldersFromJson(dynamic raw, {String? parentId}) {
+  if (raw is! List<dynamic>) return const <VoiceFolder>[];
+
+  final folders = <VoiceFolder>[];
+  for (final item in raw.whereType<Map<String, dynamic>>()) {
+    final folder = _remoteFolderFromJson(item, fallbackParentId: parentId);
+    folders.add(folder);
+    final nested =
+        item['children'] ??
+        item['childFolders'] ??
+        item['subFolders'] ??
+        item['subfolders'];
+    folders.addAll(_remoteFoldersFromJson(nested, parentId: folder.id));
+  }
+  return folders;
+}
+
+VoiceFolder _remoteFolderFromJson(
+  Map<String, dynamic> json, {
+  String? fallbackParentId,
+}) {
+  final rawParent = _normalizeRemoteParentId(
+    json['parentFolderId'] ??
+        json['parentId'] ??
+        (json['parentFolder'] as Map<String, dynamic>?)?['id'] ??
+        (json['parent'] as Map<String, dynamic>?)?['id'],
+  );
   return VoiceFolder(
-    id: '${json['id']}',
+    id: _extractRemoteFolderId(json) ?? '',
     name: json['name'] as String? ?? '폴더',
     createdAt:
         DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+    parentId: rawParent ?? fallbackParentId,
   );
+}
+
+String? _extractRemoteFolderId(Map<String, dynamic> json) {
+  final raw = json['id'] ?? json['folderId'];
+  if (raw == null) return null;
+  return '$raw';
+}
+
+String? _usableCreatedFolderId(Map<String, dynamic> json) {
+  final id = _extractRemoteFolderId(json);
+  if (id == null || id.isEmpty || id == '0') return null;
+  return id;
+}
+
+String? _normalizeRemoteParentId(Object? rawParentId) {
+  if (rawParentId == null) return null;
+  if (rawParentId is String) {
+    final trimmed = rawParentId.trim();
+    if (trimmed.isEmpty || trimmed == '0' || trimmed.toLowerCase() == 'null') {
+      return null;
+    }
+    return trimmed;
+  }
+  if (rawParentId is num && rawParentId == 0) {
+    return null;
+  }
+  return '$rawParentId';
+}
+
+String _normalizeRemoteVoiceFolderId(Object? rawFolderId) {
+  final normalized = _normalizeRemoteParentId(rawFolderId);
+  return normalized ?? VoiceFolder.uncategorizedId;
 }
 
 VoiceJob _remoteVoiceFromJson(Map<String, dynamic> json) {
@@ -490,9 +702,7 @@ VoiceJob _remoteVoiceFromJson(Map<String, dynamic> json) {
     createdAt:
         DateTime.tryParse(json['acquiredAt'] as String? ?? '') ??
         DateTime.now(),
-    folderId: json['folderId'] == null
-        ? VoiceFolder.uncategorizedId
-        : '${json['folderId']}',
+    folderId: _normalizeRemoteVoiceFolderId(json['folderId']),
     ownershipId: (json['ownershipId'] as num?)?.toInt(),
     origin: switch (acquiredBy) {
       'CREATED' => VoiceOrigin.uploaded,

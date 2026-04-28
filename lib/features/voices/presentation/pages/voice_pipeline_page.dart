@@ -25,7 +25,7 @@ class VoicePipelinePage extends StatefulWidget {
   final List<VoiceJob> jobs;
   final List<VoiceFolder> folders;
 
-  /// 폴더 안에서 올릴 때는 해당 폴더 id를 넘김. `모든 음성` 화면에서는 null.
+  /// 폴더 안에서 올릴 때는 해당 폴더 id를 넘김. 루트·미리 선택 없음이면 null.
   final Future<void> Function([String? initialFolderId]) onUploadTap;
 
   /// 직접 녹음 플로우. [initialFolderId]가 있으면 시트에서 해당 폴더가 미리 선택됨.
@@ -45,13 +45,11 @@ class VoicePipelinePage extends StatefulWidget {
 }
 
 class _VoicePipelinePageState extends State<VoicePipelinePage> {
-  static const String _scopeAll = '__scope_all__';
-
   final _searchController = TextEditingController();
   VoiceJobListSort _sort = VoiceJobListSort.newest;
   bool _refreshingScope = false;
 
-  /// null: 폴더만 보기(루트) · [_scopeAll]: 전체 목록 · 그 외: 해당 폴더
+  /// null: 루트(내 폴더 목록) · 그 외: 열린 폴더 id
   String? _scope;
 
   @override
@@ -83,8 +81,13 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
 
   List<VoiceFolder> get _rootFolders => _sortedFoldersForParent(null);
 
+  /// 루트 목록 — 시스템 폴더(미분류)는 숨김
+  List<VoiceFolder> get _rootFoldersVisible => _rootFolders
+      .where((f) => !f.isUncategorized)
+      .toList(growable: false);
+
   List<VoiceFolder> _childFoldersInScope() {
-    if (_scope == null || _scope == _scopeAll) return const <VoiceFolder>[];
+    if (_scope == null) return const <VoiceFolder>[];
     return _sortedFoldersForParent(_scope);
   }
 
@@ -94,7 +97,6 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
 
   List<VoiceJob> _jobsInScope() {
     if (_scope == null) return [];
-    if (_scope == _scopeAll) return List<VoiceJob>.from(widget.jobs);
     return widget.jobs.where((j) => j.folderId == _scope).toList();
   }
 
@@ -125,17 +127,15 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
 
   String _scopeTitle() {
     if (_scope == null) return '';
-    if (_scope == _scopeAll) return '모든 음성';
     return _folderPath(_scope!);
   }
 
-  bool get _showFolderOnCards => _scope == _scopeAll;
+  bool get _showFolderOnCards => false;
 
   int get _childFolderCountInScope => _childFoldersInScope().length;
 
   String _scopeSummary() {
     if (_scope == null) return '';
-    if (_scope == _scopeAll) return '${widget.jobs.length}개';
     return '하위 폴더 $_childFolderCountInScope개 · 음성 ${_jobsInScope().length}개';
   }
 
@@ -145,10 +145,6 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
 
   Future<void> _goBackScope() async {
     if (_scope == null) return;
-    if (_scope == _scopeAll) {
-      await _changeScope(null);
-      return;
-    }
     final parentId = _folderById(_scope!)?.parentId;
     await _changeScope(parentId);
   }
@@ -160,8 +156,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
 
   Future<void> _refreshCurrentScope() async {
     final targetScope = _scope;
-    if (targetScope == _scopeAll ||
-        targetScope == VoiceFolder.uncategorizedId) {
+    if (targetScope == VoiceFolder.uncategorizedId) {
       return;
     }
     if (!mounted) return;
@@ -236,9 +231,9 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
     }
   }
 
-  /// `모든 음성`·루트와 같이 폴더를 특정하지 않을 때 null
+  /// 루트 등 폴더 미선택이면 null
   String? get _captureInitialFolderId {
-    if (_scope == null || _scope == _scopeAll) return null;
+    if (_scope == null) return null;
     return _scope;
   }
 
@@ -340,38 +335,38 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                  sliver: SliverList.separated(
-                    itemCount: 1 + _rootFolders.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (context, i) {
-                      if (i == 0) {
+                if (_rootFoldersVisible.isEmpty)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(32, 8, 32, 24),
+                      child: _EmptyRootFoldersHint(),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    sliver: SliverList.separated(
+                      itemCount: _rootFoldersVisible.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, i) {
+                        final f = _rootFoldersVisible[i];
                         return _FolderListRow(
-                          icon: Icons.layers_rounded,
-                          title: '모든 음성',
-                          subtitle: '음성 ${widget.jobs.length}개',
-                          accent: true,
-                          onTap: () => _openFolder(_scopeAll),
+                          icon: Icons.folder_rounded,
+                          title: f.name,
+                          subtitle: _folderRowSubtitle(f.id),
+                          accent: false,
+                          onTap: () => _openFolder(f.id),
                         );
-                      }
-                      final f = _rootFolders[i - 1];
-                      return _FolderListRow(
-                        icon: Icons.folder_rounded,
-                        title: f.name,
-                        subtitle: _folderRowSubtitle(f.id),
-                        accent: false,
-                        onTap: () => _openFolder(f.id),
-                      );
-                    },
+                      },
+                    ),
                   ),
-                ),
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(24, 20, 24, 48),
-                    child: _RootHint(),
+                if (_rootFoldersVisible.isNotEmpty)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(24, 20, 24, 48),
+                      child: _RootHint(),
+                    ),
                   ),
-                ),
               ] else ...[
                 SliverToBoxAdapter(
                   child: Padding(
@@ -392,7 +387,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                           style: _voiceCaptureButtonStyle,
                         ),
                         const SizedBox(height: 16),
-                        if (childFolders.isNotEmpty && _scope != _scopeAll) ...[
+                        if (childFolders.isNotEmpty) ...[
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
@@ -520,9 +515,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                           children: [
                             Text(
                               _jobsInScope().isEmpty
-                                  ? (_scope == _scopeAll
-                                        ? '아직 올린 파일이 없어요'
-                                        : '이 폴더에 음성이 없어요')
+                                  ? '이 폴더에 음성이 없어요'
                                   : '조건에 맞는 파일이 없어요',
                               textAlign: TextAlign.center,
                               style: const TextStyle(
@@ -578,6 +571,27 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
     );
   }
 
+  Widget _buildNewFolderToolbarButton({String? currentFolderId}) {
+    return FilledButton.tonalIcon(
+      onPressed: () => widget.onOpenFolderManage(currentFolderId),
+      icon: const Icon(Icons.create_new_folder_rounded, size: 20),
+      label: const Text(
+        '새 폴더',
+        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+      ),
+      style: FilledButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        backgroundColor: YeolpumtaTheme.surface,
+        foregroundColor: YeolpumtaTheme.textPrimary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: YeolpumtaTheme.divider),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFolderBrowserHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -600,7 +614,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                   ),
                   SizedBox(height: 6),
                   Text(
-                    '위에서 바로 녹음하거나 파일을 올릴 수 있어요. 폴더로 들어가면 정리·상태를 볼 수 있어요.',
+                    '음성 녹음으로 바로 추가하거나, 새 폴더로 정리할 수 있어요. 만든 폴더를 누르면 그 안의 목록·상태를 볼 수 있어요.',
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.4,
@@ -610,15 +624,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                 ],
               ),
             ),
-            IconButton.filledTonal(
-              onPressed: () => widget.onOpenFolderManage(),
-              icon: const Icon(Icons.tune_rounded),
-              tooltip: '폴더 관리',
-              style: IconButton.styleFrom(
-                backgroundColor: YeolpumtaTheme.surface,
-                foregroundColor: YeolpumtaTheme.textPrimary,
-              ),
-            ),
+            _buildNewFolderToolbarButton(),
           ],
         ),
       ],
@@ -630,6 +636,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             IconButton(
               onPressed: _goBackScope,
@@ -661,15 +668,46 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                 ],
               ),
             ),
-            IconButton(
-              onPressed: () => widget.onOpenFolderManage(
-                _scope == _scopeAll ? null : _scope,
-              ),
-              icon: const Icon(Icons.folder_outlined),
-              color: YeolpumtaTheme.textSecondary,
-              tooltip: '폴더 관리',
-            ),
+            _buildNewFolderToolbarButton(currentFolderId: _scope),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 루트에 사용자 폴더가 없을 때
+class _EmptyRootFoldersHint extends StatelessWidget {
+  const _EmptyRootFoldersHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(
+          Icons.folder_open_rounded,
+          size: 48,
+          color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.75),
+        ),
+        const SizedBox(height: 14),
+        const Text(
+          '아직 만든 폴더가 없어요',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: YeolpumtaTheme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '오른쪽 위 「새 폴더」로 첫 폴더를 만들거나,\n음성 녹음으로 바로 추가해 보세요.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.45,
+            color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.95),
+          ),
         ),
       ],
     );
@@ -693,7 +731,7 @@ class _RootHint extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '폴더를 눌러 들어가면\n목록을 정리하고 상태를 볼 수 있어요',
+            '아래 목록에서 폴더를 누르거나,\n오른쪽 위 「새 폴더」를 눌러 보세요',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,

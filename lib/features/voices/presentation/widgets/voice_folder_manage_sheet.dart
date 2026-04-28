@@ -184,15 +184,44 @@ class _VoiceFolderManageSheetState extends State<VoiceFolderManageSheet> {
               const SizedBox(height: 12),
             ],
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: YeolpumtaTheme.accentSoft,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.create_new_folder_rounded,
+                    color: YeolpumtaTheme.accent,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
                 const Expanded(
-                  child: Text(
-                    '폴더 관리',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: YeolpumtaTheme.textPrimary,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '새 폴더',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: YeolpumtaTheme.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        '만들기 · 이름 바꾸기 · 삭제',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: YeolpumtaTheme.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 if (_busy)

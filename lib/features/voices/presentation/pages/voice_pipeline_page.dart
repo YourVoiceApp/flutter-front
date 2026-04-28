@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../domain/voice_folder.dart';
 import '../../domain/voice_job.dart';
+import '../widgets/voice_capture_choice_sheet.dart';
 import '../widgets/voice_job_list_card.dart';
 
 /// 폴더(가로 스크롤) → 폴더 안 음성 목록
@@ -12,6 +13,7 @@ class VoicePipelinePage extends StatefulWidget {
     required this.jobs,
     required this.folders,
     required this.onUploadTap,
+    required this.onDirectRecordTap,
     required this.onOpenFolderManage,
     required this.onRefreshScope,
     required this.onAdvanceDemo,
@@ -25,6 +27,9 @@ class VoicePipelinePage extends StatefulWidget {
 
   /// 폴더 안에서 올릴 때는 해당 폴더 id를 넘김. `모든 음성` 화면에서는 null.
   final Future<void> Function([String? initialFolderId]) onUploadTap;
+
+  /// 직접 녹음 플로우. [initialFolderId]가 있으면 시트에서 해당 폴더가 미리 선택됨.
+  final Future<void> Function([String? initialFolderId]) onDirectRecordTap;
 
   final Future<void> Function([String? currentFolderId]) onOpenFolderManage;
   final Future<void> Function([String? folderId]) onRefreshScope;
@@ -45,9 +50,6 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
   final _searchController = TextEditingController();
   VoiceJobListSort _sort = VoiceJobListSort.newest;
   bool _refreshingScope = false;
-
-  /// null이면 출처 전체
-  VoiceOrigin? _originFilter;
 
   /// null: 폴더만 보기(루트) · [_scopeAll]: 전체 목록 · 그 외: 해당 폴더
   String? _scope;
@@ -105,17 +107,8 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
     return list;
   }
 
-  /// 검색·폴더 범위 + 출처 필터
-  List<VoiceJob> _jobsAfterFilters() {
-    var list = _baseFiltered();
-    if (_originFilter != null) {
-      list = list.where((j) => j.origin == _originFilter).toList();
-    }
-    return list;
-  }
-
   List<VoiceJob> _visibleJobs() {
-    var list = List<VoiceJob>.from(_jobsAfterFilters());
+    var list = List<VoiceJob>.from(_baseFiltered());
     switch (_sort) {
       case VoiceJobListSort.newest:
         list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -128,12 +121,6 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
         break;
     }
     return list;
-  }
-
-  int _countForOrigin(VoiceOrigin? o) {
-    final base = _baseFiltered();
-    if (o == null) return base.length;
-    return base.where((j) => j.origin == o).length;
   }
 
   String _scopeTitle() {
@@ -249,13 +236,58 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
     }
   }
 
-  Future<void> _handleUploadInScope() {
-    if (_scope == null) return Future.value();
-    if (_scope == _scopeAll) {
-      return widget.onUploadTap();
-    }
-    return widget.onUploadTap(_scope);
+  /// `모든 음성`·루트와 같이 폴더를 특정하지 않을 때 null
+  String? get _captureInitialFolderId {
+    if (_scope == null || _scope == _scopeAll) return null;
+    return _scope;
   }
+
+  /// 폴더 / 모든 음성 목록 안에서 — 업로드 / 직접 녹음 (현재 폴더 id 미리 선택 가능)
+  Future<void> _openVoiceCaptureEntry() async {
+    final initial = _captureInitialFolderId;
+    final choice = await showModalBottomSheet<VoiceCaptureChoice?>(
+      context: context,
+      backgroundColor: YeolpumtaTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => const VoiceCaptureChoiceSheet(),
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case VoiceCaptureChoice.upload:
+        await widget.onUploadTap(initial);
+      case VoiceCaptureChoice.record:
+        await widget.onDirectRecordTap(initial);
+    }
+  }
+
+  /// 루트 화면(_scope == null)에서만 사용
+  Future<void> _openVoiceCaptureFromRoot() async {
+    final choice = await showModalBottomSheet<VoiceCaptureChoice?>(
+      context: context,
+      backgroundColor: YeolpumtaTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => const VoiceCaptureChoiceSheet(),
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case VoiceCaptureChoice.upload:
+        await widget.onUploadTap();
+      case VoiceCaptureChoice.record:
+        await widget.onDirectRecordTap();
+    }
+  }
+
+  ButtonStyle get _voiceCaptureButtonStyle => FilledButton.styleFrom(
+    backgroundColor: YeolpumtaTheme.accent,
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    elevation: 0,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -291,6 +323,23 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                   ),
                 ),
               if (_scope == null) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                    child: FilledButton.icon(
+                      onPressed: _openVoiceCaptureFromRoot,
+                      icon: const Icon(Icons.mic_rounded, size: 22),
+                      label: const Text(
+                        '음성 녹음',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: _voiceCaptureButtonStyle,
+                    ),
+                  ),
+                ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
                   sliver: SliverList.separated(
@@ -331,19 +380,16 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         FilledButton.icon(
-                          onPressed: _handleUploadInScope,
-                          icon: const Icon(Icons.upload_rounded, size: 20),
-                          label: Text(
-                            _scope == _scopeAll ? '음성 올리기' : '이 폴더에 올리기',
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: YeolpumtaTheme.accent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                          onPressed: _openVoiceCaptureEntry,
+                          icon: const Icon(Icons.mic_rounded, size: 22),
+                          label: const Text(
+                            '음성 녹음',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
+                          style: _voiceCaptureButtonStyle,
                         ),
                         const SizedBox(height: 16),
                         if (childFolders.isNotEmpty && _scope != _scopeAll) ...[
@@ -459,107 +505,6 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            '출처',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: YeolpumtaTheme.textSecondary.withValues(
-                                alpha: 0.88,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: FilterChip(
-                                  avatar: Icon(
-                                    Icons.filter_list_rounded,
-                                    size: 16,
-                                    color: _originFilter == null
-                                        ? YeolpumtaTheme.accent
-                                        : YeolpumtaTheme.textSecondary,
-                                  ),
-                                  label: Text(
-                                    '전체 (${_countForOrigin(null)})',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: _originFilter == null
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      color: _originFilter == null
-                                          ? YeolpumtaTheme.accent
-                                          : YeolpumtaTheme.textSecondary,
-                                    ),
-                                  ),
-                                  selected: _originFilter == null,
-                                  onSelected: (_) =>
-                                      setState(() => _originFilter = null),
-                                  showCheckmark: false,
-                                  backgroundColor: YeolpumtaTheme.surface,
-                                  selectedColor: YeolpumtaTheme.accentSoft,
-                                  side: const BorderSide(
-                                    color: YeolpumtaTheme.divider,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                ),
-                              ),
-                              for (final o in VoiceOrigin.values)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: FilterChip(
-                                    avatar: Icon(
-                                      VoiceOriginStyle.of(o).icon,
-                                      size: 15,
-                                      color: _originFilter == o
-                                          ? VoiceOriginStyle.of(o).accent
-                                          : YeolpumtaTheme.textSecondary,
-                                    ),
-                                    label: Text(
-                                      '${o.label} (${_countForOrigin(o)})',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: _originFilter == o
-                                            ? FontWeight.w700
-                                            : FontWeight.w500,
-                                        color: _originFilter == o
-                                            ? VoiceOriginStyle.of(o).accent
-                                            : YeolpumtaTheme.textSecondary,
-                                      ),
-                                    ),
-                                    selected: _originFilter == o,
-                                    onSelected: (_) =>
-                                        setState(() => _originFilter = o),
-                                    showCheckmark: false,
-                                    backgroundColor: YeolpumtaTheme.surface,
-                                    selectedColor: VoiceOriginStyle.of(o).tint,
-                                    side: BorderSide(
-                                      color: _originFilter == o
-                                          ? VoiceOriginStyle.of(
-                                              o,
-                                            ).accent.withValues(alpha: 0.35)
-                                          : YeolpumtaTheme.divider,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -587,13 +532,17 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                             ),
                             if (_jobsInScope().isEmpty) ...[
                               const SizedBox(height: 16),
-                              FilledButton(
-                                onPressed: _handleUploadInScope,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: YeolpumtaTheme.accent,
-                                  foregroundColor: Colors.white,
+                              FilledButton.icon(
+                                onPressed: _openVoiceCaptureEntry,
+                                icon: const Icon(Icons.mic_rounded, size: 22),
+                                label: const Text(
+                                  '음성 녹음',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                                child: const Text('지금 올리기'),
+                                style: _voiceCaptureButtonStyle,
                               ),
                             ],
                           ],
@@ -651,7 +600,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                   ),
                   SizedBox(height: 6),
                   Text(
-                    '폴더를 골라 들어가면 그 안에서 파일을 올리고 상태를 볼 수 있어요.',
+                    '위에서 바로 녹음하거나 파일을 올릴 수 있어요. 폴더로 들어가면 정리·상태를 볼 수 있어요.',
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.4,
@@ -744,7 +693,7 @@ class _RootHint extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '폴더를 눌러 들어가면\n파일을 올리고 상태를 볼 수 있어요',
+            '폴더를 눌러 들어가면\n목록을 정리하고 상태를 볼 수 있어요',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,

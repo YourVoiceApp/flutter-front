@@ -17,6 +17,7 @@ import '../../../voices/domain/voice_upload_request.dart';
 import '../../../voices/presentation/pages/voice_listen_page.dart';
 import '../../../voices/presentation/pages/voice_pipeline_page.dart';
 import '../../../voices/presentation/widgets/voice_folder_manage_sheet.dart';
+import '../../../voices/presentation/widgets/voice_record_sheet.dart';
 import '../../../voices/presentation/widgets/voice_upload_sheet.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 
@@ -90,6 +91,20 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     return result.folderId;
   }
 
+  Future<void> _submitVoiceUpload(VoiceUploadRequest upload) async {
+    try {
+      final next = await _repo.uploadVoice(_data, upload);
+      if (!mounted) return;
+      setState(() => _data = next);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('음성을 업로드했어요.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   Future<void> _openUpload([String? initialFolderId]) async {
     final upload = await showModalBottomSheet<VoiceUploadRequest?>(
       context: context,
@@ -106,17 +121,26 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
       ),
     );
     if (upload == null || !mounted) return;
-    try {
-      final next = await _repo.uploadVoice(_data, upload);
-      if (!mounted) return;
-      setState(() => _data = next);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('음성을 업로드했어요.')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
+    await _submitVoiceUpload(upload);
+  }
+
+  Future<void> _openDirectRecord([String? initialFolderId]) async {
+    final upload = await showModalBottomSheet<VoiceUploadRequest?>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: YeolpumtaTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => VoiceRecordSheet(
+        folders: _data.folders,
+        initialFolderId: initialFolderId,
+        onCreateFolder: _createFolderForUpload,
+      ),
+    );
+    if (upload == null || !mounted) return;
+    await _submitVoiceUpload(upload);
   }
 
   Future<void> _openFolderManage([String? currentFolderId]) async {
@@ -451,6 +475,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
             jobs: _data.jobs,
             folders: _data.folders,
             onUploadTap: _openUpload,
+            onDirectRecordTap: _openDirectRecord,
             onOpenFolderManage: _openFolderManage,
             onRefreshScope: _refreshVoiceFolderScope,
             onAdvanceDemo: _advanceDemo,

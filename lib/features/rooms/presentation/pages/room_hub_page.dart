@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
 import '../../data/room_repository.dart';
 import '../../domain/room.dart';
@@ -71,16 +72,13 @@ class _RoomHubPageState extends State<RoomHubPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bg = widget.embeddedInMainShell
-        ? const Color(0xFFF2F3F5)
-        : const Color(0xFFF4F7FF);
     final bottomPad = widget.embeddedInMainShell ? 24.0 : 100.0;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: YeolpumtaTheme.bg,
       appBar: widget.embeddedInMainShell
           ? null
-          : AppBar(title: const Text('가족 · 공유 방')),
+          : AppBar(title: const Text('함께')),
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad),
         children: [
@@ -91,10 +89,14 @@ class _RoomHubPageState extends State<RoomHubPage> {
           if (_loading)
             const WhiteCard(child: Center(child: CircularProgressIndicator()))
           else if (_rooms.isEmpty)
-            const WhiteCard(
+            WhiteCard(
               child: Text(
                 '아직 방이 없어요. 아래에서 만들거나 입장해 보세요.',
-                style: TextStyle(color: Color(0xFF64748B)),
+                style: TextStyle(
+                  color: YeolpumtaTheme.textSecondary,
+                  fontSize: 15,
+                  height: 1.4,
+                ),
               ),
             )
           else
@@ -120,9 +122,12 @@ class _RoomHubPageState extends State<RoomHubPage> {
                   icon: const Icon(Icons.add_home_rounded),
                   label: const Text('방 만들기'),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFE07C4C),
+                    backgroundColor: YeolpumtaTheme.accent,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
@@ -130,12 +135,27 @@ class _RoomHubPageState extends State<RoomHubPage> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _openJoinFlow,
-                  icon: const Icon(Icons.login_rounded),
-                  label: const Text('입장하기'),
+                  icon: Icon(
+                    Icons.login_rounded,
+                    color: YeolpumtaTheme.accent,
+                  ),
+                  label: Text(
+                    '입장하기',
+                    style: TextStyle(
+                      color: YeolpumtaTheme.accent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFC2410C),
-                    side: const BorderSide(color: Color(0xFFFDBA74)),
+                    side: BorderSide(
+                      color: YeolpumtaTheme.outline,
+                      width: 1,
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    backgroundColor: YeolpumtaTheme.surface,
                   ),
                 ),
               ),
@@ -151,18 +171,25 @@ Widget _heroCard(BuildContext context) {
   return Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFFFFF4E6), Color(0xFFFFE8D6)],
+      gradient: LinearGradient(
+        colors: [
+          YeolpumtaTheme.accentSoft,
+          YeolpumtaTheme.accentSoft.withValues(alpha: 0.45),
+          Colors.white.withValues(alpha: 0.92),
+        ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: const Color(0xFFFDBA74)),
-      boxShadow: const [
+      border: Border.all(
+        color: YeolpumtaTheme.accent.withValues(alpha: 0.2),
+        width: 1,
+      ),
+      boxShadow: [
         BoxShadow(
-          color: Color(0x12000000),
-          blurRadius: 12,
-          offset: Offset(0, 6),
+          color: Colors.black.withValues(alpha: 0.06),
+          blurRadius: 14,
+          offset: const Offset(0, 4),
         ),
       ],
     ),
@@ -174,21 +201,22 @@ Widget _heroCard(BuildContext context) {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.85),
+                color: YeolpumtaTheme.surface,
                 borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: YeolpumtaTheme.outline),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.family_restroom_rounded,
-                color: Color(0xFFC2410C),
+                color: YeolpumtaTheme.accent,
                 size: 28,
               ),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Text(
                 '같은 방에 초대된 사람들만,\n서로 학습해 둔 목소리를 골라 쓸 수 있어요.',
                 style: TextStyle(
-                  color: Color(0xFF7C2D12),
+                  color: YeolpumtaTheme.textPrimary,
                   fontSize: 15,
                   height: 1.35,
                   fontWeight: FontWeight.w600,
@@ -198,9 +226,13 @@ Widget _heroCard(BuildContext context) {
           ],
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           '방장이 방을 만들면 초대 코드가 생기고, 비밀번호를 켜 두면 코드 + 암호로만 들어올 수 있어요. (지금은 화면만 연결됨)',
-          style: TextStyle(color: Color(0xFF9A3412), fontSize: 13, height: 1.4),
+          style: TextStyle(
+            color: YeolpumtaTheme.textSecondary,
+            fontSize: 13,
+            height: 1.45,
+          ),
         ),
       ],
     ),
@@ -216,75 +248,92 @@ class _RoomEntryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
+      color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF4E6),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  Icons.meeting_room_rounded,
-                  color: Color(0xFFE07C4C),
-                ),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: YeolpumtaTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: YeolpumtaTheme.outline),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      room.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '코드 ${room.inviteCode} · 멤버 ${room.memberNames.length}명 · 공유 음성 ${room.sharedVoices.length}개',
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (room.requiresPassword)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.lock_outline_rounded,
-                              size: 14,
-                              color: Color(0xFFEA580C),
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '비밀번호 필요',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFFEA580C),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: YeolpumtaTheme.accentSoft,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.meeting_room_rounded,
+                    color: YeolpumtaTheme.accent,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        room.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: YeolpumtaTheme.textPrimary,
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        '코드 ${room.inviteCode} · 멤버 ${room.memberNames.length}명 · 공유 음성 ${room.sharedVoices.length}개',
+                        style: TextStyle(
+                          color: YeolpumtaTheme.textSecondary,
+                          fontSize: 12,
+                          height: 1.25,
+                        ),
+                      ),
+                      if (room.requiresPassword)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.lock_outline_rounded,
+                                size: 14,
+                                color: YeolpumtaTheme.accent,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '비밀번호 필요',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: YeolpumtaTheme.accent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
-            ],
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.8),
+                ),
+              ],
+            ),
           ),
         ),
       ),

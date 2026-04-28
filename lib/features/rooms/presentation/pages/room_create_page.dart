@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
 import '../../data/room_repository.dart';
 import '../../domain/room.dart';
@@ -59,7 +60,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FF),
+      backgroundColor: YeolpumtaTheme.bg,
       appBar: AppBar(title: const Text('방 만들기')),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -68,9 +69,13 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '가족이나 지인만 들어올 수 있게 방을 열고, 초대 코드를 나눠 주세요.',
-                  style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                  style: TextStyle(
+                    color: YeolpumtaTheme.textSecondary,
+                    fontSize: 14,
+                    height: 1.45,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -83,13 +88,25 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                 const SizedBox(height: 16),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('비밀번호로 입장만 허용'),
-                  subtitle: const Text(
+                  title: Text(
+                    '비밀번호로 입장만 허용',
+                    style: TextStyle(
+                      color: YeolpumtaTheme.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: Text(
                     '초대 코드와 함께 암호를 아는 사람만 입장 (데모)',
-                    style: TextStyle(fontSize: 12),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: YeolpumtaTheme.textSecondary,
+                      height: 1.35,
+                    ),
                   ),
                   value: _usePassword,
-                  activeThumbColor: const Color(0xFFE07C4C),
+                  activeThumbColor: YeolpumtaTheme.accent,
+                  activeTrackColor: YeolpumtaTheme.accent.withValues(alpha: 0.35),
                   onChanged: (v) => setState(() => _usePassword = v),
                 ),
                 if (_usePassword) ...[
@@ -110,8 +127,12 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
           FilledButton(
             onPressed: _busy ? null : _create,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFE07C4C),
+              backgroundColor: YeolpumtaTheme.accent,
+              foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
             child: _busy
                 ? const SizedBox(
@@ -122,7 +143,10 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                       color: Colors.white,
                     ),
                   )
-                : const Text('방 만들기'),
+                : const Text(
+                    '방 만들기',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  ),
           ),
         ],
       ),

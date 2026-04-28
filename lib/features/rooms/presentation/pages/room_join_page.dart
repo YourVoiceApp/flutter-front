@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
 import '../../data/room_repository.dart';
 import '../../domain/room.dart';
@@ -139,7 +140,7 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FF),
+      backgroundColor: YeolpumtaTheme.bg,
       appBar: AppBar(title: const Text('방 입장')),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -149,6 +150,13 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SegmentedButton<int>(
+                  style: SegmentedButton.styleFrom(
+                    backgroundColor: YeolpumtaTheme.iconMutedBg,
+                    selectedBackgroundColor: YeolpumtaTheme.accentSoft,
+                    selectedForegroundColor: YeolpumtaTheme.accent,
+                    foregroundColor: YeolpumtaTheme.textPrimary,
+                    side: const BorderSide(color: YeolpumtaTheme.outline),
+                  ),
                   segments: const [
                     ButtonSegment(
                       value: 0,
@@ -187,12 +195,12 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   '데모: 목록에 있는 FAM-7K2Q(우리 가족 방)는 비밀번호가 필요하다고 가정해 두었어요. 「코드 + 비밀번호」로 전환한 뒤 아무 암호 4자 이상을 넣어 보세요.',
                   style: TextStyle(
-                    color: Color(0xFF94A3B8),
+                    color: YeolpumtaTheme.textSecondary,
                     fontSize: 12,
-                    height: 1.35,
+                    height: 1.4,
                   ),
                 ),
               ],
@@ -202,8 +210,12 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
           FilledButton(
             onPressed: _busy ? null : _join,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF3B6AF5),
+              backgroundColor: YeolpumtaTheme.accent,
+              foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
             child: _busy
                 ? const SizedBox(
@@ -214,7 +226,10 @@ class _RoomJoinPageState extends State<RoomJoinPage> {
                       color: Colors.white,
                     ),
                   )
-                : const Text('입장'),
+                : const Text(
+                    '입장',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  ),
           ),
         ],
       ),

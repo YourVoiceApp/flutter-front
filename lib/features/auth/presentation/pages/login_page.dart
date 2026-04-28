@@ -87,16 +87,6 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _socialComingSoon(String name) {
-    FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$name 로그인은 연동 예정이에요.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
   Future<void> _showAuthErrorDialog({
     required String title,
     required String body,
@@ -568,15 +558,6 @@ class _LoginPageState extends State<LoginPage> {
               isLoading: _kakaoSigningIn,
               onPressed: _signInWithKakao,
             ),
-            const SizedBox(height: 10),
-            _SocialLoginButton(
-              label: '네이버로 시작하기',
-              backgroundColor: const Color(0xFF03C75A),
-              foregroundColor: Colors.white,
-              borderColor: const Color(0xFF03C75A),
-              leading: _SocialMark.naver(),
-              onPressed: () => _socialComingSoon('네이버'),
-            ),
           ],
         ),
       ),
@@ -706,30 +687,6 @@ class _SocialMark {
             Icons.chat_bubble_rounded,
             size: 16,
             color: Color(0xFF191919),
-          ),
-        ),
-      ),
-    );
-  }
-
-  static Widget naver() {
-    return SizedBox(
-      width: 28,
-      height: 28,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.22),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: const Center(
-          child: Text(
-            'N',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              height: 1,
-            ),
           ),
         ),
       ),

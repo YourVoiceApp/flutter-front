@@ -4,6 +4,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
 import '../../domain/room.dart';
 
@@ -15,7 +16,7 @@ Future<void> showSharedVoicePlaySheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFFF8FAFC),
+    backgroundColor: YeolpumtaTheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -200,7 +201,7 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE2E8F0),
+                    color: YeolpumtaTheme.divider,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -212,12 +213,12 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF4E6),
+                      color: YeolpumtaTheme.accentSoft,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.record_voice_over_rounded,
-                      color: Color(0xFFE07C4C),
+                      color: YeolpumtaTheme.accent,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -227,16 +228,16 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                       children: [
                         Text(
                           widget.voice.voiceTitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
+                            color: YeolpumtaTheme.textPrimary,
                           ),
                         ),
                         Text(
                           '${widget.voice.ownerName}님이 공유한 음성 프로필',
-                          style: const TextStyle(
-                            color: Color(0xFF64748B),
+                          style: TextStyle(
+                            color: YeolpumtaTheme.textSecondary,
                             fontSize: 13,
                           ),
                         ),
@@ -246,8 +247,8 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
                               widget.voice.subtitle!,
-                              style: const TextStyle(
-                                color: Color(0xFF94A3B8),
+                              style: TextStyle(
+                                color: YeolpumtaTheme.textSecondary,
                                 fontSize: 12,
                               ),
                             ),
@@ -258,11 +259,11 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                 ],
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 '저장된 문장을 불러오는 게 아니라, 이 음색(프로필)으로 읽힐 내용을 아래에 직접 적거나 말로 입력해요. '
                 '재생은 기기 TTS이며, 이후 서버와 연결하면 이 프로필 음색에 맞출 수 있어요.',
                 style: TextStyle(
-                  color: Color(0xFF64748B),
+                  color: YeolpumtaTheme.textSecondary,
                   fontSize: 12,
                   height: 1.4,
                 ),
@@ -281,28 +282,31 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                     icon: Icon(
                       _listening ? Icons.mic_rounded : Icons.mic_none_rounded,
                       color: _listening
-                          ? const Color(0xFFE07C4C)
+                          ? YeolpumtaTheme.accent
                           : (_speechReady
-                                ? const Color(0xFF3B6AF5)
-                                : const Color(0xFFCBD5E1)),
+                                ? YeolpumtaTheme.accent.withValues(alpha: 0.75)
+                                : YeolpumtaTheme.textSecondary),
                     ),
                   ),
                 ),
               ),
               if (_listening) ...[
                 const SizedBox(height: 8),
-                const Row(
+                Row(
                   children: [
                     SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: YeolpumtaTheme.accent,
+                      ),
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
                       '듣는 중… 말씀하시면 글자로 반영돼요',
                       style: TextStyle(
-                        color: Color(0xFFE07C4C),
+                        color: YeolpumtaTheme.accent,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -323,9 +327,12 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                       ),
                       label: Text(_speaking ? '재생 중…' : '듣기'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFE07C4C),
+                        backgroundColor: YeolpumtaTheme.accent,
                         foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                     ),
                   ),
@@ -337,6 +344,11 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                       label: const Text('중지'),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(50),
+                        foregroundColor: YeolpumtaTheme.textPrimary,
+                        side: const BorderSide(color: YeolpumtaTheme.outline),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                     ),
                   ),
@@ -350,8 +362,14 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                         await _speak();
                       }
                     : null,
-                icon: const Icon(Icons.replay_rounded, size: 20),
-                label: const Text('처음부터 다시 듣기'),
+                icon: Icon(Icons.replay_rounded, size: 20, color: YeolpumtaTheme.accent),
+                label: Text(
+                  '처음부터 다시 듣기',
+                  style: TextStyle(
+                    color: YeolpumtaTheme.accent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
               Align(
@@ -362,7 +380,10 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                     await _stop();
                     if (context.mounted) Navigator.of(context).pop();
                   },
-                  child: const Text('닫기'),
+                  child: Text(
+                    '닫기',
+                    style: TextStyle(color: YeolpumtaTheme.textSecondary),
+                  ),
                 ),
               ),
             ],

@@ -586,7 +586,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
         foregroundColor: YeolpumtaTheme.textPrimary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: YeolpumtaTheme.divider),
+          side: const BorderSide(color: YeolpumtaTheme.outline),
         ),
       ),
     );
@@ -763,62 +763,76 @@ class _FolderListRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final shadowColor = Colors.black.withValues(alpha: 0.06);
+    final borderColor =
+        accent ? YeolpumtaTheme.accent.withValues(alpha: 0.22) : YeolpumtaTheme.outline;
+
     return Material(
-      color: accent ? YeolpumtaTheme.accentSoft : YeolpumtaTheme.surface,
-      borderRadius: BorderRadius.circular(14),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: accent
-                      ? YeolpumtaTheme.accent.withValues(alpha: 0.12)
-                      : YeolpumtaTheme.bg,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 24,
-                  color: accent
-                      ? YeolpumtaTheme.accent
-                      : YeolpumtaTheme.textSecondary,
-                ),
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: accent ? YeolpumtaTheme.accentSoft : YeolpumtaTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: shadowColor,
+                blurRadius: 14,
+                offset: const Offset(0, 4),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: YeolpumtaTheme.textPrimary,
-                        letterSpacing: -0.2,
-                        height: 1.25,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: YeolpumtaTheme.textSecondary,
-                      ),
-                    ),
-                  ],
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: accent
+                        ? YeolpumtaTheme.accent.withValues(alpha: 0.12)
+                        : YeolpumtaTheme.iconMutedBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 24,
+                    color: YeolpumtaTheme.accent,
+                  ),
                 ),
-              ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: YeolpumtaTheme.textPrimary,
+                          letterSpacing: -0.2,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: YeolpumtaTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               Icon(
                 Icons.chevron_right_rounded,
                 color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.7),
@@ -828,6 +842,7 @@ class _FolderListRow extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

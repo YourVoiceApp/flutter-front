@@ -12,13 +12,14 @@ class WhiteCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: YeolpumtaTheme.surface,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
+        border: Border.all(color: YeolpumtaTheme.outline, width: 1),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x14000000),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 14,
-            offset: Offset(0, 6),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -38,14 +39,28 @@ Widget quickActionTile({
   return Padding(
     padding: const EdgeInsets.only(bottom: 10),
     child: Material(
-      color: Colors.white,
+      color: YeolpumtaTheme.surface,
+      elevation: 0,
+      shadowColor: Colors.transparent,
       borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: YeolpumtaTheme.outline),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
             children: [
               Container(
                 width: 42,
@@ -92,6 +107,7 @@ Widget quickActionTile({
         ),
       ),
     ),
+    ),
   );
 }
 
@@ -121,11 +137,11 @@ InputDecoration fieldDecoration({
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: YeolpumtaTheme.divider),
+      borderSide: const BorderSide(color: YeolpumtaTheme.outline),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: YeolpumtaTheme.divider),
+      borderSide: const BorderSide(color: YeolpumtaTheme.outline),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),

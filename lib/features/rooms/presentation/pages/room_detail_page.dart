@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
+import '../../../voices/domain/voice_job.dart';
 import '../../data/room_repository.dart';
 import '../../domain/room.dart';
-import '../../../voices/domain/voice_job.dart';
 import '../widgets/shared_voice_play_sheet.dart';
 
 typedef RoomUpdated = void Function(Room room);
@@ -65,7 +66,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: YeolpumtaTheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -88,24 +89,28 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE2E8F0),
+                        color: YeolpumtaTheme.divider,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     '내가 공유할 음성',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
+                      color: YeolpumtaTheme.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
+                  Text(
                     '학습이 끝난 목소리 중 이 방에서 쓰도록 허용할 항목을 고르세요.',
-                    style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                    style: TextStyle(
+                      color: YeolpumtaTheme.textSecondary,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -115,8 +120,17 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         final on = chosen.contains(v.id);
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
+                          color: YeolpumtaTheme.surface,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(
+                              color: YeolpumtaTheme.outline,
+                            ),
+                          ),
                           child: CheckboxListTile(
                             value: on,
+                            activeColor: YeolpumtaTheme.accent,
                             onChanged: (c) {
                               setModalState(() {
                                 if (c == true) {
@@ -128,16 +142,23 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                             },
                             title: Text(
                               v.fileName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w700,
+                                color: YeolpumtaTheme.textPrimary,
                               ),
                             ),
-                            subtitle: Text(v.origin.label),
-                            secondary: const CircleAvatar(
-                              backgroundColor: Color(0xFFEAF0FF),
+                            subtitle: Text(
+                              v.origin.label,
+                              style: TextStyle(
+                                color: YeolpumtaTheme.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            secondary: CircleAvatar(
+                              backgroundColor: YeolpumtaTheme.accentSoft,
                               child: Icon(
                                 Icons.graphic_eq_rounded,
-                                color: Color(0xFF3B6AF5),
+                                color: YeolpumtaTheme.accent,
                                 size: 20,
                               ),
                             ),
@@ -161,7 +182,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         _notifyParent();
                         navigator.pop();
                         messenger.showSnackBar(
-                          const SnackBar(content: Text('이 방에 공유 목록을 반영했어요.')),
+                          const SnackBar(
+                            content: Text('이 방에 공유 목록을 반영했어요.'),
+                          ),
                         );
                       } catch (e) {
                         if (!mounted) return;
@@ -169,10 +192,17 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       }
                     },
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFE07C4C),
+                      backgroundColor: YeolpumtaTheme.accent,
+                      foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
-                    child: const Text('이 방에 반영'),
+                    child: const Text(
+                      '이 방에 반영',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ],
               ),
@@ -186,7 +216,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FF),
+      backgroundColor: YeolpumtaTheme.bg,
       appBar: AppBar(
         title: Text(_room.name),
         actions: [
@@ -196,17 +226,26 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               showDialog<void>(
                 context: context,
                 builder: (c) => AlertDialog(
-                  title: const Text('초대 코드'),
+                  backgroundColor: YeolpumtaTheme.surface,
+                  surfaceTintColor: Colors.transparent,
+                  title: Text(
+                    '초대 코드',
+                    style: TextStyle(
+                      color: YeolpumtaTheme.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SelectableText(
                         _room.inviteCode,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1.2,
+                          color: YeolpumtaTheme.accent,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -214,14 +253,23 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         _room.requiresPassword
                             ? '비밀번호가 켜진 방이에요. 코드와 함께 암호를 전달하세요.'
                             : '코드만 알면 입장할 수 있어요.',
-                        style: const TextStyle(color: Color(0xFF64748B)),
+                        style: TextStyle(
+                          color: YeolpumtaTheme.textSecondary,
+                          height: 1.4,
+                        ),
                       ),
                     ],
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(c),
-                      child: const Text('닫기'),
+                      child: Text(
+                        '닫기',
+                        style: TextStyle(
+                          color: YeolpumtaTheme.accent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -245,12 +293,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '멤버',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
-                    color: Color(0xFF0F172A),
+                    color: YeolpumtaTheme.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -260,15 +308,36 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                   children: [
                     for (final m in _room.memberNames)
                       Chip(
-                        avatar: const Icon(Icons.person_rounded, size: 16),
+                        avatar: Icon(
+                          Icons.person_rounded,
+                          size: 16,
+                          color: YeolpumtaTheme.accent,
+                        ),
                         label: Text(m),
-                        backgroundColor: const Color(0xFFEAF0FF),
-                        side: BorderSide.none,
+                        backgroundColor: YeolpumtaTheme.accentSoft,
+                        side: BorderSide(
+                          color: YeolpumtaTheme.accent.withValues(alpha: 0.2),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
                       ),
                     ActionChip(
-                      avatar: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('초대'),
-                      backgroundColor: const Color(0xFFFFF4E6),
+                      avatar: Icon(
+                        Icons.add_rounded,
+                        size: 18,
+                        color: YeolpumtaTheme.accent,
+                      ),
+                      label: Text(
+                        '초대',
+                        style: TextStyle(
+                          color: YeolpumtaTheme.accent,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      backgroundColor: YeolpumtaTheme.surface,
+                      side: const BorderSide(color: YeolpumtaTheme.outline),
                       onPressed: () =>
                           showToast(context, '초대 코드 입장 API는 아직 문서에 없습니다.'),
                     ),
@@ -284,8 +353,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               const Spacer(),
               Text(
                 '${_room.sharedVoices.length}개',
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
+                style: TextStyle(
+                  color: YeolpumtaTheme.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -293,10 +362,13 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           ),
           const SizedBox(height: 10),
           if (_room.sharedVoices.isEmpty)
-            const WhiteCard(
+            WhiteCard(
               child: Text(
                 '아직 공유된 음성이 없어요. 아래에서 내 음성을 올려 보세요.',
-                style: TextStyle(color: Color(0xFF64748B)),
+                style: TextStyle(
+                  color: YeolpumtaTheme.textSecondary,
+                  height: 1.4,
+                ),
               ),
             )
           else
@@ -310,12 +382,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFF4E6),
+                          color: YeolpumtaTheme.accentSoft,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.record_voice_over_rounded,
-                          color: Color(0xFFE07C4C),
+                          color: YeolpumtaTheme.accent,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -325,15 +397,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           children: [
                             Text(
                               v.voiceTitle,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 15,
+                                color: YeolpumtaTheme.textPrimary,
                               ),
                             ),
                             Text(
                               '${v.ownerName} · ${v.subtitle ?? ''}',
-                              style: const TextStyle(
-                                color: Color(0xFF64748B),
+                              style: TextStyle(
+                                color: YeolpumtaTheme.textSecondary,
                                 fontSize: 12,
                               ),
                             ),
@@ -342,7 +415,13 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       ),
                       TextButton(
                         onPressed: () => showSharedVoicePlaySheet(context, v),
-                        child: const Text('사용'),
+                        child: Text(
+                          '사용',
+                          style: TextStyle(
+                            color: YeolpumtaTheme.accent,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -353,10 +432,15 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _shareVoiceSheet,
-        backgroundColor: const Color(0xFFE07C4C),
+        backgroundColor: YeolpumtaTheme.accent,
         foregroundColor: Colors.white,
+        elevation: 2,
+        highlightElevation: 4,
         icon: const Icon(Icons.upload_rounded),
-        label: const Text('내 음성 공유'),
+        label: const Text(
+          '내 음성 공유',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }

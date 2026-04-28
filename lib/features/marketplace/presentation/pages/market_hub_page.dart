@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../../monetization/data/premium_repository.dart';
+import '../../../onboarding/data/onboarding_prefs.dart';
+import '../../../onboarding/presentation/widgets/spotlight_coach_overlay.dart';
 import '../../../monetization/presentation/pages/ads_removal_paywall_page.dart';
 import '../../../voices/domain/voice_job.dart';
 import '../../data/market_repository.dart';
@@ -30,6 +32,10 @@ class _MarketHubPageState extends State<MarketHubPage> {
   final _marketRepo = MarketRepository();
   final _previewPlayer = PreviewVoiceHelper();
   final _browseSearchCtrl = TextEditingController();
+  final GlobalKey _marketStackKey = GlobalKey();
+  final GlobalKey _marketSegmentKey = GlobalKey();
+  final GlobalKey _firstBrowseRowKey = GlobalKey();
+
   List<MarketListing> _list = [];
   bool _loading = true;
   String? _previewingId;
@@ -38,10 +44,106 @@ class _MarketHubPageState extends State<MarketHubPage> {
   int _segment = 0;
   _BrowseSort _browseSort = _BrowseSort.popular;
 
+  bool _segmentCoach = false;
+  bool _previewCoachActive = false;
+  Rect? _segmentHole;
+  Rect? _previewHole;
+  int? _segmentCoachBaseline;
+
   @override
   void initState() {
     super.initState();
     _reload();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapMarketCoaches());
+  }
+
+  Future<void> _bootstrapMarketCoaches() async {
+    final segDone = await OnboardingPrefs.isMarketSegmentCoachDone();
+    final prevDone = await OnboardingPrefs.isMarketPreviewCoachDone();
+    if (!mounted) return;
+    setState(() {
+      _segmentCoach = !segDone;
+      _previewCoachActive = segDone && !prevDone;
+      if (_segmentCoach) _segmentCoachBaseline = _segment;
+    });
+    _scheduleMarketMeasure();
+  }
+
+  void _scheduleMarketMeasure() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureMarketHoles());
+  }
+
+  void _measureMarketHoles() {
+    if (_loading) return;
+    final stackCtx = _marketStackKey.currentContext;
+    final stackBox = stackCtx?.findRenderObject() as RenderBox?;
+    if (stackBox == null || !stackBox.hasSize) return;
+
+    if (_segmentCoach) {
+      final segBox =
+          _marketSegmentKey.currentContext?.findRenderObject() as RenderBox?;
+      if (segBox != null && segBox.hasSize) {
+        final topLeft =
+            stackBox.globalToLocal(segBox.localToGlobal(Offset.zero));
+        const pad = 6.0;
+        if (mounted) {
+          setState(() {
+            _segmentHole = Rect.fromLTWH(
+              topLeft.dx - pad,
+              topLeft.dy - pad,
+              segBox.size.width + pad * 2,
+              segBox.size.height + pad * 2,
+            );
+          });
+        }
+      }
+      return;
+    }
+
+    if (_previewCoachActive && _segment == 0) {
+      final others = _list.where((e) => !e.isMine).toList();
+      final browse = _filterAndSortBrowse(others);
+      if (browse.isEmpty || browse.first.previewScript.trim().isEmpty) {
+        OnboardingPrefs.setMarketPreviewCoachDone().then((_) {
+          if (mounted) {
+            setState(() {
+              _previewCoachActive = false;
+              _previewHole = null;
+            });
+          }
+        });
+        return;
+      }
+      final rowBox =
+          _firstBrowseRowKey.currentContext?.findRenderObject() as RenderBox?;
+      if (rowBox != null && rowBox.hasSize) {
+        final topLeft =
+            stackBox.globalToLocal(rowBox.localToGlobal(Offset.zero));
+        const pad = 8.0;
+        if (mounted) {
+          setState(() {
+            _previewHole = Rect.fromLTWH(
+              topLeft.dx - pad,
+              topLeft.dy - pad,
+              rowBox.size.width + pad * 2,
+              rowBox.size.height + pad * 2,
+            );
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _maybeSkipEmptyPreviewCoach() async {
+    if (!_previewCoachActive) return;
+    final others = _list.where((e) => !e.isMine).toList();
+    if (others.isNotEmpty) return;
+    await OnboardingPrefs.setMarketPreviewCoachDone();
+    if (!mounted) return;
+    setState(() {
+      _previewCoachActive = false;
+      _previewHole = null;
+    });
   }
 
   @override
@@ -74,6 +176,14 @@ class _MarketHubPageState extends State<MarketHubPage> {
   }
 
   Future<void> _playPreview(MarketListing m) async {
+    if (_previewCoachActive) {
+      await OnboardingPrefs.setMarketPreviewCoachDone();
+      if (!mounted) return;
+      setState(() {
+        _previewCoachActive = false;
+        _previewHole = null;
+      });
+    }
     final t = m.previewScript.trim();
     if (t.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -97,6 +207,8 @@ class _MarketHubPageState extends State<MarketHubPage> {
         _list = l;
         _loading = false;
       });
+      await _maybeSkipEmptyPreviewCoach();
+      if (_segmentCoach || _previewCoachActive) _scheduleMarketMeasure();
     }
   }
 
@@ -188,14 +300,25 @@ class _MarketHubPageState extends State<MarketHubPage> {
     final others = _list.where((e) => !e.isMine).toList();
     final browse = _filterAndSortBrowse(others);
 
-    return ColoredBox(
+    final coachScrollLock = !_loading &&
+        ((_segmentCoach && _segmentHole != null) ||
+            (_previewCoachActive && _previewHole != null));
+
+    return Stack(
+      key: _marketStackKey,
+      clipBehavior: Clip.none,
+      fit: StackFit.expand,
+      children: [
+        ColoredBox(
       color: YeolpumtaTheme.bg,
       child: _loading
           ? const Center(child: CircularProgressIndicator())
           : CustomScrollView(
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
+              physics: coachScrollLock
+                  ? const NeverScrollableScrollPhysics()
+                  : const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
@@ -233,7 +356,9 @@ class _MarketHubPageState extends State<MarketHubPage> {
                           ],
                         ),
                         const SizedBox(height: 20),
-                        SegmentedButton<int>(
+                        KeyedSubtree(
+                          key: _marketSegmentKey,
+                          child: SegmentedButton<int>(
                           segments: const [
                             ButtonSegment(
                               value: 0,
@@ -247,8 +372,29 @@ class _MarketHubPageState extends State<MarketHubPage> {
                             ),
                           ],
                           selected: {_segment},
-                          onSelectionChanged: (s) {
-                            setState(() => _segment = s.first);
+                          onSelectionChanged: (s) async {
+                            final next = s.first;
+                            if (_segmentCoach &&
+                                _segmentCoachBaseline != null &&
+                                next != _segmentCoachBaseline) {
+                              await OnboardingPrefs.setMarketSegmentCoachDone();
+                              if (!mounted) return;
+                              final prevDone =
+                                  await OnboardingPrefs.isMarketPreviewCoachDone();
+                              if (!mounted) return;
+                              final hasOthers = _list.any((e) => !e.isMine);
+                              setState(() {
+                                _segmentCoach = false;
+                                _segmentHole = null;
+                                _segment = next;
+                                _segmentCoachBaseline = null;
+                                _previewCoachActive =
+                                    !prevDone && next == 0 && hasOthers;
+                              });
+                              _scheduleMarketMeasure();
+                              return;
+                            }
+                            setState(() => _segment = next);
                           },
                           style: ButtonStyle(
                             visualDensity: VisualDensity.compact,
@@ -257,11 +403,15 @@ class _MarketHubPageState extends State<MarketHubPage> {
                             ),
                           ),
                         ),
+                        ),
                         const SizedBox(height: 18),
                         if (_segment == 0) ...[
                           TextField(
                             controller: _browseSearchCtrl,
-                            onChanged: (_) => setState(() {}),
+                            onChanged: (_) {
+                              setState(() {});
+                              if (_previewCoachActive) _scheduleMarketMeasure();
+                            },
                             textInputAction: TextInputAction.search,
                             style: const TextStyle(
                               fontSize: 15,
@@ -339,6 +489,7 @@ class _MarketHubPageState extends State<MarketHubPage> {
                               selected: {_browseSort},
                               onSelectionChanged: (s) {
                                 setState(() => _browseSort = s.first);
+                                if (_previewCoachActive) _scheduleMarketMeasure();
                               },
                               style: ButtonStyle(
                                 visualDensity: VisualDensity.compact,
@@ -409,6 +560,31 @@ class _MarketHubPageState extends State<MarketHubPage> {
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
               ],
             ),
+        ),
+        if (_segmentCoach && _segmentHole != null && !_loading)
+          Positioned.fill(
+            child: SpotlightCoachOverlay(
+              holeRect: _segmentHole!,
+              title: '마켓 두 가지 모드',
+              body: '둘러보기는 쇼핑, 내 판매는 올릴 때 써요.',
+              tapHint: '👉 다른 쪽 탭도 눌러볼래?',
+              holeRadius: 16,
+            ),
+          ),
+        if (_previewCoachActive &&
+            _previewHole != null &&
+            !_loading &&
+            _segment == 0)
+          Positioned.fill(
+            child: SpotlightCoachOverlay(
+              holeRect: _previewHole!,
+              title: '짧게 미리듣기',
+              body: '5초 듣기로 느낌만 볼 수 있어요.',
+              tapHint: '👉 초록 버튼 눌러봐',
+              holeRadius: 14,
+            ),
+          ),
+      ],
     );
   }
 
@@ -478,6 +654,7 @@ class _MarketHubPageState extends State<MarketHubPage> {
         itemCount: browse.length,
         separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (context, i) => _YeolMarketRow(
+          key: i == 0 && _previewCoachActive ? _firstBrowseRowKey : null,
           listing: browse[i],
           onBuy: () => _buyDemo(browse[i]),
           onPreview: () => _playPreview(browse[i]),
@@ -631,6 +808,7 @@ class _YeolQuietRow extends StatelessWidget {
 /// 시장 행 — 구매 탭 / 5초 미리듣기 버튼 분리
 class _YeolMarketRow extends StatelessWidget {
   const _YeolMarketRow({
+    super.key,
     required this.listing,
     required this.onBuy,
     required this.onPreview,

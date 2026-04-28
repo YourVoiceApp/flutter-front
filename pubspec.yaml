@@ -31,3 +31,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/login_hero.png
+    - assets/images/voice_thumb_upload.png
+    - assets/images/voice_thumb_room.png
+    - assets/images/voice_thumb_market.png

@@ -20,6 +20,22 @@ import '../../../voices/presentation/widgets/voice_folder_manage_sheet.dart';
 import '../../../voices/presentation/widgets/voice_record_sheet.dart';
 import '../../../voices/presentation/widgets/voice_upload_sheet.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
+import '../../../onboarding/data/onboarding_prefs.dart';
+import '../../../onboarding/presentation/widgets/tab_coach_overlay.dart';
+
+const _kTabCoachGuestHint = '지금은 둘러보기! 로그인하면 풀기능이에요.';
+
+const _tabCoachTitles = <String>[
+  '여기가 음성 홈이에요',
+  '함께 탭',
+  '마켓 탭',
+];
+
+const _tabCoachBodies = <String>[
+  '「음성 녹음」이 시작점이에요. 폴더로 정리도 돼요.',
+  '방 만들고 코드로 들어와요. 안에서는 음성 나눠요.',
+  '듣기·판매 탭 나눠서 쇼핑해요.',
+];
 
 /// 핵심만: 음성 · 함께 · 마켓 (듣기는 음성 카드에서)
 class YeolpumtaMainShell extends StatefulWidget {
@@ -47,6 +63,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
   bool _adsRemoved = false;
 
   int _index = 0;
+  bool _showTabCoach = false;
 
   @override
   void initState() {
@@ -65,6 +82,27 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
       _adsRemoved = ads;
       _ready = true;
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncTabCoach());
+  }
+
+  Future<void> _syncTabCoach() async {
+    if (!_ready || !mounted) return;
+    final tab = _index.clamp(0, 2);
+    if (tab == 0) {
+      setState(() => _showTabCoach = false);
+      return;
+    }
+    final dismissed = await OnboardingPrefs.isShellTabCoachDismissed(tab);
+    if (!mounted) return;
+    if (_index.clamp(0, 2) != tab) return;
+    setState(() => _showTabCoach = !dismissed);
+  }
+
+  Future<void> _dismissTabCoach() async {
+    final tab = _index.clamp(0, 2);
+    await OnboardingPrefs.setShellTabCoachDismissed(tab);
+    if (!mounted) return;
+    setState(() => _showTabCoach = false);
   }
 
   Future<void> _refreshVoiceFolderScope([String? folderId]) async {
@@ -468,34 +506,56 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
         ),
         title: Text(titles[_index.clamp(0, titles.length - 1)]),
       ),
-      body: IndexedStack(
-        index: _index.clamp(0, 2),
+      body: Stack(
+        fit: StackFit.expand,
         children: [
-          VoicePipelinePage(
-            jobs: _data.jobs,
-            folders: _data.folders,
-            onUploadTap: _openUpload,
-            onDirectRecordTap: _openDirectRecord,
-            onOpenFolderManage: _openFolderManage,
-            onRefreshScope: _refreshVoiceFolderScope,
-            onAdvanceDemo: _advanceDemo,
-            onDeleteJob: _deleteJob,
-            onMoveJob: _moveJob,
-            onListenTap: _openListen,
+          Positioned.fill(
+            child: IndexedStack(
+              index: _index.clamp(0, 2),
+              children: [
+                VoicePipelinePage(
+                  jobs: _data.jobs,
+                  folders: _data.folders,
+                  onUploadTap: _openUpload,
+                  onDirectRecordTap: _openDirectRecord,
+                  onOpenFolderManage: _openFolderManage,
+                  onRefreshScope: _refreshVoiceFolderScope,
+                  onAdvanceDemo: _advanceDemo,
+                  onDeleteJob: _deleteJob,
+                  onMoveJob: _moveJob,
+                  onListenTap: _openListen,
+                ),
+                const RoomHubPage(embeddedInMainShell: true),
+                MarketHubPage(
+                  completedJobs: _completed,
+                  premiumRepository: _premiumRepo,
+                ),
+              ],
+            ),
           ),
-          const RoomHubPage(embeddedInMainShell: true),
-          MarketHubPage(
-            completedJobs: _completed,
-            premiumRepository: _premiumRepo,
-          ),
+          if (_showTabCoach)
+            TabCoachOverlay(
+              tabIndex: _index.clamp(0, 2),
+              title: _tabCoachTitles[_index.clamp(0, 2)],
+              body: _tabCoachBodies[_index.clamp(0, 2)],
+              guestHint: widget.isGuestMode ? _kTabCoachGuestHint : null,
+              onGotIt: _dismissTabCoach,
+              onBarrierTap: () => setState(() => _showTabCoach = false),
+            ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index.clamp(0, 2),
         onDestinationSelected: (i) async {
-          setState(() => _index = i.clamp(0, 2));
+          setState(() {
+            _index = i.clamp(0, 2);
+            _showTabCoach = false;
+          });
           final v = await _premiumRepo.isAdsRemoved();
           if (mounted) setState(() => _adsRemoved = v);
+          if (mounted) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => _syncTabCoach());
+          }
         },
         destinations: const [
           NavigationDestination(

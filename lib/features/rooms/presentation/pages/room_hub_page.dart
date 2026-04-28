@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
+import '../../../onboarding/data/onboarding_prefs.dart';
+import '../../../onboarding/presentation/widgets/spotlight_coach_overlay.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
 import '../../data/room_repository.dart';
 import '../../domain/room.dart';
@@ -21,13 +23,81 @@ class RoomHubPage extends StatefulWidget {
 
 class _RoomHubPageState extends State<RoomHubPage> {
   final _roomRepository = RoomRepository();
+  final GlobalKey _hubStackKey = GlobalKey();
+  final GlobalKey _roomActionsKey = GlobalKey();
   List<Room> _rooms = const [];
   bool _loading = true;
+  bool _hubCoach = false;
+  Rect? _hubHole;
 
   @override
   void initState() {
     super.initState();
     _loadRooms();
+  }
+
+  Future<void> _syncHubCoachAfterLoad() async {
+    final done = await OnboardingPrefs.isRoomHubIntroDone();
+    if (!mounted) return;
+    if (done) {
+      setState(() {
+        _hubCoach = false;
+        _hubHole = null;
+      });
+      return;
+    }
+    if (_rooms.isNotEmpty) {
+      await OnboardingPrefs.setRoomHubIntroDone();
+      if (!mounted) return;
+      setState(() {
+        _hubCoach = false;
+        _hubHole = null;
+      });
+      return;
+    }
+    setState(() => _hubCoach = true);
+    _scheduleHubMeasure();
+  }
+
+  void _scheduleHubMeasure() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureHubHole());
+  }
+
+  void _measureHubHole() {
+    if (!_hubCoach) return;
+    final rowCtx = _roomActionsKey.currentContext;
+    final stackCtx = _hubStackKey.currentContext;
+    if (rowCtx == null || stackCtx == null) return;
+    final rowBox = rowCtx.findRenderObject() as RenderBox?;
+    final stackBox = stackCtx.findRenderObject() as RenderBox?;
+    if (rowBox == null ||
+        stackBox == null ||
+        !rowBox.hasSize ||
+        !stackBox.hasSize) {
+      return;
+    }
+    final topLeft =
+        stackBox.globalToLocal(rowBox.localToGlobal(Offset.zero));
+    const pad = 8.0;
+    if (!mounted) return;
+    setState(() {
+      _hubHole = Rect.fromLTWH(
+        topLeft.dx - pad,
+        topLeft.dy - pad,
+        rowBox.size.width + pad * 2,
+        rowBox.size.height + pad * 2,
+      );
+    });
+  }
+
+  Future<void> _finishHubCoachIfNeeded() async {
+    if (!_hubCoach) return;
+    await OnboardingPrefs.setRoomHubIntroDone();
+    if (!mounted) return;
+    setState(() {
+      _hubCoach = false;
+      _hubHole = null;
+    });
   }
 
   Future<void> _loadRooms() async {
@@ -37,6 +107,7 @@ class _RoomHubPageState extends State<RoomHubPage> {
       _rooms = rooms;
       _loading = false;
     });
+    await _syncHubCoachAfterLoad();
   }
 
   void _openRoom(Room room) {
@@ -56,6 +127,8 @@ class _RoomHubPageState extends State<RoomHubPage> {
   }
 
   Future<void> _openJoinFlow() async {
+    await _finishHubCoachIfNeeded();
+    if (!mounted) return;
     final navigator = Navigator.of(context);
     final joined = await navigator.push<Room>(
       MaterialPageRoute(
@@ -79,88 +152,117 @@ class _RoomHubPageState extends State<RoomHubPage> {
       appBar: widget.embeddedInMainShell
           ? null
           : AppBar(title: const Text('함께')),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad),
+      body: Stack(
+        key: _hubStackKey,
+        clipBehavior: Clip.none,
         children: [
-          _heroCard(context),
-          const SizedBox(height: 20),
-          sectionTitle('참여 중인 방'),
-          const SizedBox(height: 10),
-          if (_loading)
-            const WhiteCard(child: Center(child: CircularProgressIndicator()))
-          else if (_rooms.isEmpty)
-            WhiteCard(
-              child: Text(
-                '아직 방이 없어요. 아래에서 만들거나 입장해 보세요.',
-                style: TextStyle(
-                  color: YeolpumtaTheme.textSecondary,
-                  fontSize: 15,
-                  height: 1.4,
+          Positioned.fill(
+            child: ListView(
+              physics: (_hubCoach && _hubHole != null)
+                  ? const NeverScrollableScrollPhysics()
+                  : null,
+              padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPad),
+              children: [
+                _heroCard(context),
+                const SizedBox(height: 20),
+                sectionTitle('참여 중인 방'),
+                const SizedBox(height: 10),
+                if (_loading)
+                  const WhiteCard(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_rooms.isEmpty)
+                  WhiteCard(
+                    child: Text(
+                      '아직 방이 없어요. 아래에서 만들거나 입장해 보세요.',
+                      style: TextStyle(
+                        color: YeolpumtaTheme.textSecondary,
+                        fontSize: 15,
+                        height: 1.4,
+                      ),
+                    ),
+                  )
+                else
+                  ..._rooms.map(
+                    (r) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _RoomEntryTile(room: r, onTap: () => _openRoom(r)),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                Row(
+                  key: _roomActionsKey,
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          final nav = Navigator.of(context);
+                          await _finishHubCoachIfNeeded();
+                          if (!mounted) return;
+                          final created = await nav.push<Room>(
+                            MaterialPageRoute(
+                              builder: (_) => const RoomCreatePage(),
+                            ),
+                          );
+                          if (!mounted || created == null) return;
+                          setState(() => _rooms = [created, ..._rooms]);
+                          _openRoom(created);
+                        },
+                        icon: const Icon(Icons.add_home_rounded),
+                        label: const Text('방 만들기'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: YeolpumtaTheme.accent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _openJoinFlow,
+                        icon: Icon(
+                          Icons.login_rounded,
+                          color: YeolpumtaTheme.accent,
+                        ),
+                        label: Text(
+                          '입장하기',
+                          style: TextStyle(
+                            color: YeolpumtaTheme.accent,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: YeolpumtaTheme.outline,
+                            width: 1,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          backgroundColor: YeolpumtaTheme.surface,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            )
-          else
-            ..._rooms.map(
-              (r) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _RoomEntryTile(room: r, onTap: () => _openRoom(r)),
+              ],
+            ),
+          ),
+          if (_hubCoach && _hubHole != null)
+            Positioned.fill(
+              child: SpotlightCoachOverlay(
+                holeRect: _hubHole!,
+                title: '방 만들기 · 입장',
+                body: '새 방을 만들거나, 코드로 들어올 수 있어요.',
+                tapHint: '👉 마음에 드는 쪽을 눌러봐',
+                holeRadius: 16,
               ),
             ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () async {
-                    final created = await Navigator.of(context).push<Room>(
-                      MaterialPageRoute(builder: (_) => const RoomCreatePage()),
-                    );
-                    if (!context.mounted || created == null) return;
-                    setState(() => _rooms = [created, ..._rooms]);
-                    _openRoom(created);
-                  },
-                  icon: const Icon(Icons.add_home_rounded),
-                  label: const Text('방 만들기'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: YeolpumtaTheme.accent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _openJoinFlow,
-                  icon: Icon(
-                    Icons.login_rounded,
-                    color: YeolpumtaTheme.accent,
-                  ),
-                  label: Text(
-                    '입장하기',
-                    style: TextStyle(
-                      color: YeolpumtaTheme.accent,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: YeolpumtaTheme.outline,
-                      width: 1,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    backgroundColor: YeolpumtaTheme.surface,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );

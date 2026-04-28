@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
+import '../../../onboarding/data/onboarding_prefs.dart';
+import '../../../onboarding/presentation/widgets/spotlight_coach_overlay.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
+import '../../../shared/presentation/widgets/voice_cute_leading_art.dart';
 import '../../../voices/domain/voice_job.dart';
 import '../../data/room_repository.dart';
 import '../../domain/room.dart';
@@ -26,15 +29,73 @@ class RoomDetailPage extends StatefulWidget {
 
 class _RoomDetailPageState extends State<RoomDetailPage> {
   final _roomRepository = RoomRepository();
+  final GlobalKey _detailStackKey = GlobalKey();
+  final GlobalKey _shareFabKey = GlobalKey();
   late Room _room;
   List<VoiceJob> _myVoices = const [];
   bool _loading = true;
+  bool _shareFabCoach = false;
+  Rect? _shareFabHole;
 
   @override
   void initState() {
     super.initState();
     _room = widget.initialRoom;
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapShareFabCoach());
+  }
+
+  Future<void> _bootstrapShareFabCoach() async {
+    final done = await OnboardingPrefs.isRoomShareFabDone();
+    if (!mounted) return;
+    setState(() => _shareFabCoach = !done);
+    if (!done) _scheduleFabMeasure();
+  }
+
+  void _scheduleFabMeasure() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureShareFabHole());
+  }
+
+  void _measureShareFabHole() {
+    if (!_shareFabCoach || _loading) return;
+    final fabCtx = _shareFabKey.currentContext;
+    final stackCtx = _detailStackKey.currentContext;
+    if (fabCtx == null || stackCtx == null) return;
+    final fabBox = fabCtx.findRenderObject() as RenderBox?;
+    final stackBox = stackCtx.findRenderObject() as RenderBox?;
+    if (fabBox == null ||
+        stackBox == null ||
+        !fabBox.hasSize ||
+        !stackBox.hasSize) {
+      return;
+    }
+    final topLeft =
+        stackBox.globalToLocal(fabBox.localToGlobal(Offset.zero));
+    const pad = 8.0;
+    if (!mounted) return;
+    setState(() {
+      _shareFabHole = Rect.fromLTWH(
+        topLeft.dx - pad,
+        topLeft.dy - pad,
+        fabBox.size.width + pad * 2,
+        fabBox.size.height + pad * 2,
+      );
+    });
+  }
+
+  Future<void> _finishShareFabCoachIfNeeded() async {
+    if (!_shareFabCoach) return;
+    await OnboardingPrefs.setRoomShareFabDone();
+    if (!mounted) return;
+    setState(() {
+      _shareFabCoach = false;
+      _shareFabHole = null;
+    });
+  }
+
+  Future<void> _onShareFabPressed() async {
+    await _finishShareFabCoachIfNeeded();
+    _shareVoiceSheet();
   }
 
   void _notifyParent() {
@@ -52,6 +113,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         _loading = false;
       });
       _notifyParent();
+      if (_shareFabCoach) _scheduleFabMeasure();
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -154,13 +216,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                 fontSize: 12,
                               ),
                             ),
-                            secondary: CircleAvatar(
-                              backgroundColor: YeolpumtaTheme.accentSoft,
-                              child: Icon(
-                                Icons.graphic_eq_rounded,
-                                color: YeolpumtaTheme.accent,
-                                size: 20,
-                              ),
+                            secondary: VoiceCuteLeadingAvatar(
+                              origin: v.origin,
+                              size: 48,
+                              borderRadius: 14,
                             ),
                           ),
                         );
@@ -215,7 +274,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Stack(
+      key: _detailStackKey,
+      fit: StackFit.expand,
+      children: [
+        Scaffold(
       backgroundColor: YeolpumtaTheme.bg,
       appBar: AppBar(
         title: Text(_room.name),
@@ -280,6 +343,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         ],
       ),
       body: ListView(
+        physics: (_shareFabCoach && _shareFabHole != null)
+            ? const NeverScrollableScrollPhysics()
+            : null,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
         children: [
           if (_loading)
@@ -378,17 +444,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                 child: WhiteCard(
                   child: Row(
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: YeolpumtaTheme.accentSoft,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.record_voice_over_rounded,
-                          color: YeolpumtaTheme.accent,
-                        ),
+                      VoiceCuteLeadingAvatar(
+                        origin: VoiceOrigin.sharedRoom,
+                        size: 44,
+                        borderRadius: 12,
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -431,7 +490,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _shareVoiceSheet,
+        key: _shareFabKey,
+        onPressed: _onShareFabPressed,
         backgroundColor: YeolpumtaTheme.accent,
         foregroundColor: Colors.white,
         elevation: 2,
@@ -442,6 +502,18 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
+    ),
+        if (_shareFabCoach && _shareFabHole != null && !_loading)
+          Positioned.fill(
+            child: SpotlightCoachOverlay(
+              holeRect: _shareFabHole!,
+              title: '내 음성 넘겨주기',
+              body: '이 방 사람들이 쓸 수 있게 내 음성을 골라요.',
+              tapHint: '👉 아래 긴 버튼을 눌러봐',
+              holeRadius: 22,
+            ),
+          ),
+      ],
     );
   }
 }

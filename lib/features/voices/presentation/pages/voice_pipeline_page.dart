@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
+import '../../../onboarding/data/onboarding_prefs.dart';
+import '../../../onboarding/presentation/widgets/spotlight_coach_overlay.dart';
 import '../../domain/voice_folder.dart';
 import '../../domain/voice_job.dart';
 import '../widgets/voice_capture_choice_sheet.dart';
@@ -45,12 +47,69 @@ class VoicePipelinePage extends StatefulWidget {
 }
 
 class _VoicePipelinePageState extends State<VoicePipelinePage> {
+  final GlobalKey _bodyStackKey = GlobalKey();
+  final GlobalKey _rootRecordButtonKey = GlobalKey();
   final _searchController = TextEditingController();
   VoiceJobListSort _sort = VoiceJobListSort.newest;
   bool _refreshingScope = false;
+  bool _voiceCtaCoachActive = false;
+  Rect? _recordButtonHoleLocal;
 
   /// null: 루트(내 폴더 목록) · 그 외: 열린 폴더 id
   String? _scope;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadVoiceCtaCoach());
+  }
+
+  Future<void> _loadVoiceCtaCoach() async {
+    final done = await OnboardingPrefs.isVoiceRootCtaCoachDone();
+    if (!mounted) return;
+    setState(() => _voiceCtaCoachActive = !done);
+    if (!done) _scheduleMeasureRecordHole();
+  }
+
+  void _scheduleMeasureRecordHole() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _measureRecordButtonHole();
+    });
+  }
+
+  void _measureRecordButtonHole() {
+    if (!_voiceCtaCoachActive || _scope != null) return;
+    final buttonCtx = _rootRecordButtonKey.currentContext;
+    final stackCtx = _bodyStackKey.currentContext;
+    if (buttonCtx == null || stackCtx == null) return;
+    final buttonBox = buttonCtx.findRenderObject() as RenderBox?;
+    final stackBox = stackCtx.findRenderObject() as RenderBox?;
+    if (buttonBox == null ||
+        stackBox == null ||
+        !buttonBox.hasSize ||
+        !stackBox.hasSize) {
+      return;
+    }
+    final topLeft =
+        stackBox.globalToLocal(buttonBox.localToGlobal(Offset.zero));
+    const pad = 6.0;
+    final r = Rect.fromLTWH(
+      topLeft.dx - pad,
+      topLeft.dy - pad,
+      buttonBox.size.width + pad * 2,
+      buttonBox.size.height + pad * 2,
+    );
+    if (!mounted) return;
+    setState(() => _recordButtonHoleLocal = r);
+  }
+
+  @override
+  void didUpdateWidget(covariant VoicePipelinePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_voiceCtaCoachActive && _scope == null) {
+      _scheduleMeasureRecordHole();
+    }
+  }
 
   @override
   void dispose() {
@@ -152,6 +211,9 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
   Future<void> _changeScope(String? nextScope) async {
     setState(() => _scope = nextScope);
     await _refreshCurrentScope();
+    if (_voiceCtaCoachActive && nextScope == null) {
+      _scheduleMeasureRecordHole();
+    }
   }
 
   Future<void> _refreshCurrentScope() async {
@@ -276,6 +338,20 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
     }
   }
 
+  Future<void> _onRootVoiceCaptureTap() async {
+    if (_voiceCtaCoachActive) {
+      await OnboardingPrefs.setVoiceRootCtaCoachDone();
+      if (!mounted) return;
+      setState(() {
+        _voiceCtaCoachActive = false;
+        _recordButtonHoleLocal = null;
+      });
+      await widget.onDirectRecordTap();
+      return;
+    }
+    await _openVoiceCaptureFromRoot();
+  }
+
   ButtonStyle get _voiceCaptureButtonStyle => FilledButton.styleFrom(
     backgroundColor: YeolpumtaTheme.accent,
     foregroundColor: Colors.white,
@@ -298,10 +374,22 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
       },
       child: Scaffold(
         backgroundColor: YeolpumtaTheme.bg,
-        body: RefreshIndicator(
-          onRefresh: _refreshCurrentScope,
-          child: CustomScrollView(
-            slivers: [
+        body: Stack(
+          key: _bodyStackKey,
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: RefreshIndicator(
+                onRefresh: _refreshCurrentScope,
+                child: CustomScrollView(
+                  physics: (_voiceCtaCoachActive &&
+                          _scope == null &&
+                          _recordButtonHoleLocal != null)
+                      ? const NeverScrollableScrollPhysics()
+                      : const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                  slivers: [
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
@@ -322,7 +410,8 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
                     child: FilledButton.icon(
-                      onPressed: _openVoiceCaptureFromRoot,
+                      key: _rootRecordButtonKey,
+                      onPressed: _onRootVoiceCaptureTap,
                       icon: const Icon(Icons.mic_rounded, size: 22),
                       label: const Text(
                         '음성 녹음',
@@ -566,6 +655,21 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
               ],
             ],
           ),
+        ),
+            ),
+            if (_voiceCtaCoachActive &&
+                _scope == null &&
+                _recordButtonHoleLocal != null)
+              Positioned.fill(
+                child: SpotlightCoachOverlay(
+                  holeRect: _recordButtonHoleLocal!,
+                  title: '시작은 여기!',
+                  body: '가장 많이 쓰는 건 이 초록 버튼이에요. 누르면 바로 녹음으로 갈게요.',
+                  tapHint: '👉 한번 눌러볼래?',
+                  holeRadius: 18,
+                ),
+              ),
+          ],
         ),
       ),
     );

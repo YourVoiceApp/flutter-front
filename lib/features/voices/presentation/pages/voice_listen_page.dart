@@ -6,6 +6,7 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
+import '../../../shared/presentation/widgets/voice_cute_leading_art.dart';
 import '../../data/voice_library_repository.dart';
 import '../../domain/voice_folder.dart';
 import '../../domain/voice_job.dart';
@@ -124,7 +125,7 @@ class _VoiceListenPageState extends State<VoiceListenPage> {
                   itemCount: list.length,
                   separatorBuilder: (_, _) => const Divider(
                     height: 1,
-                    indent: 56,
+                    indent: 72,
                   ),
                   itemBuilder: (context, i) {
                     final j = list[i];
@@ -144,7 +145,39 @@ class _VoiceListenPageState extends State<VoiceListenPage> {
                         ),
                     };
                     return ListTile(
-                      leading: Icon(ic, color: col, size: 26),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
+                      leading: SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
+                          children: [
+                            VoiceCuteLeadingAvatar(
+                              origin: j.origin,
+                              size: 48,
+                              borderRadius: 14,
+                            ),
+                            Positioned(
+                              right: -2,
+                              bottom: 0,
+                              child: Material(
+                                color: YeolpumtaTheme.surface,
+                                elevation: 1,
+                                shadowColor: Colors.black26,
+                                shape: const CircleBorder(),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(3),
+                                  child: Icon(ic, color: col, size: 14),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       title: Text(
                         j.fileName,
                         maxLines: 2,
@@ -158,7 +191,7 @@ class _VoiceListenPageState extends State<VoiceListenPage> {
                       subtitle: Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
-                          '${j.status.label} · ${_folderLine(j)}',
+                          '${j.status.label} · ${j.origin.label} · ${_folderLine(j)}',
                           style: const TextStyle(
                             fontSize: 12,
                             height: 1.3,
@@ -342,6 +375,12 @@ class _VoiceListenPageState extends State<VoiceListenPage> {
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  VoiceCuteLeadingAvatar(
+                                    origin: _selected!.origin,
+                                    size: 52,
+                                    borderRadius: 14,
+                                  ),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:

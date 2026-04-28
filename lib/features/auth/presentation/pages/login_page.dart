@@ -340,17 +340,19 @@ class _LoginPageState extends State<LoginPage> {
             Center(
               child: Column(
                 children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: YeolpumtaTheme.accentSoft,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      Icons.graphic_eq_rounded,
-                      size: 36,
-                      color: YeolpumtaTheme.accent,
+                  Semantics(
+                    label: '소중한 사람의 목소리를 남기는 일러스트',
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(26),
+                      child: SizedBox(
+                        width: 260,
+                        height: 168,
+                        child: Image.asset(
+                          'assets/images/login_hero.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => const _LoginHeroFallback(),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -692,4 +694,91 @@ class _SocialMark {
       ),
     );
   }
+}
+
+/// [Image.asset] 실패 시 보여 줄 히어로 장면
+class _LoginHeroFallback extends StatelessWidget {
+  const _LoginHeroFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _LoginHeroFallbackPainter(),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _LoginHeroFallbackPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final bg = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          YeolpumtaTheme.accentSoft,
+          Colors.white,
+          const Color(0xFFFFF7FB),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(rect);
+    canvas.drawRect(rect, bg);
+
+    final left = size.width * 0.22;
+    final baseY = size.height * 0.62;
+    final pSoft = Paint()..color = YeolpumtaTheme.accent.withValues(alpha: 0.22);
+    canvas.drawCircle(Offset(left, baseY), size.width * 0.12, pSoft);
+    canvas.drawCircle(
+      Offset(size.width * 0.78, baseY - size.height * 0.06),
+      size.width * 0.1,
+      pSoft,
+    );
+
+    final heart = Path();
+    final hc = Offset(size.width * 0.5, size.height * 0.38);
+    const hs = 18.0;
+    heart.addOval(
+      Rect.fromCenter(
+        center: hc + const Offset(-hs * 0.28, -hs * 0.2),
+        width: hs * 0.75,
+        height: hs * 0.75,
+      ),
+    );
+    heart.addOval(
+      Rect.fromCenter(
+        center: hc + const Offset(hs * 0.28, -hs * 0.2),
+        width: hs * 0.75,
+        height: hs * 0.75,
+      ),
+    );
+    heart.moveTo(hc.dx, hc.dy + hs * 0.55);
+    heart.lineTo(hc.dx - hs * 0.65, hc.dy);
+    heart.quadraticBezierTo(hc.dx - hs * 0.55, hc.dy - hs * 0.65, hc.dx, hc.dy - hs * 0.35);
+    heart.lineTo(hc.dx + hs * 0.65, hc.dy);
+    heart.quadraticBezierTo(hc.dx + hs * 0.55, hc.dy - hs * 0.65, hc.dx, hc.dy - hs * 0.35);
+    heart.close();
+    canvas.drawPath(
+      heart,
+      Paint()..color = const Color(0xFFF472B6).withValues(alpha: 0.55),
+    );
+
+    final mic = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, size.height * 0.72),
+        width: size.width * 0.14,
+        height: size.height * 0.22,
+      ),
+      const Radius.circular(8),
+    );
+    canvas.drawRRect(mic, Paint()..color = YeolpumtaTheme.accent.withValues(alpha: 0.85));
+    canvas.drawCircle(
+      Offset(size.width * 0.5, size.height * 0.87),
+      size.width * 0.06,
+      Paint()..color = YeolpumtaTheme.accent.withValues(alpha: 0.45),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

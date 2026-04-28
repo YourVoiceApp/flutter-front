@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../domain/voice_job.dart';
+import '../../../shared/presentation/widgets/voice_cute_leading_art.dart';
 
 /// 출처별 색·아이콘 (목록·마이페이지 공통)
 class VoiceOriginStyle {
@@ -57,7 +58,7 @@ class VoiceOriginChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(s.icon, size: 13, color: s.accent),
+          VoiceOriginCuteGlyph(origin: origin, size: 13, color: s.accent),
           const SizedBox(width: 4),
           Text(
             origin.shortLabel,
@@ -127,13 +128,9 @@ class VoiceJobListCard extends StatelessWidget {
         child: Stack(
           children: [
             Positioned(
-              right: -8,
-              bottom: -12,
-              child: Icon(
-                Icons.graphic_eq_rounded,
-                size: 96,
-                color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.06),
-              ),
+              right: -6,
+              bottom: -10,
+              child: const VoiceCardSoftDecoration(),
             ),
             IntrinsicHeight(
               child: Row(
@@ -149,22 +146,7 @@ class VoiceJobListCard extends StatelessWidget {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: originStyle.tint,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: originStyle.accent.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            child: Icon(
-                              originStyle.icon,
-                              color: originStyle.accent,
-                              size: 24,
-                            ),
-                          ),
+                          VoiceCuteLeadingAvatar(origin: job.origin),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(

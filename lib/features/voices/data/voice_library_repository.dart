@@ -396,6 +396,11 @@ class VoiceLibraryRepository {
     if (await _authService.hasStoredSession()) {
       final created = await _api.postMultipartObject(
         '/voices/cloned-voice',
+        queryParameters: <String, String?>{
+          'name': request.name,
+          if (request.description != null && request.description!.isNotEmpty)
+            'description': request.description,
+        },
         fields: <String, String>{
           'name': request.name,
           if (request.description != null && request.description!.isNotEmpty)

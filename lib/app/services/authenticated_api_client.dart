@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../../features/auth/data/auth_api_client.dart';
 import '../../features/auth/data/auth_service.dart';
@@ -108,12 +109,29 @@ class AuthenticatedApiClient {
     return response.bodyBytes;
   }
 
+  MediaType? _multipartMediaType(String filename) {
+    final dot = filename.lastIndexOf('.');
+    if (dot <= 0 || dot >= filename.length - 1) return null;
+    switch (filename.substring(dot + 1).toLowerCase()) {
+      case 'wav':
+        return MediaType('audio', 'wav');
+      case 'mp3':
+      case 'mpeg':
+        return MediaType('audio', 'mpeg');
+      case 'm4a':
+        return MediaType('audio', 'mp4');
+      default:
+        return null;
+    }
+  }
+
   Future<Map<String, dynamic>> postMultipartObject(
     String path, {
     Map<String, String> fields = const {},
     List<MultipartPayloadFile> files = const [],
+    Map<String, String?>? queryParameters,
   }) async {
-    final uri = _uri(path);
+    final uri = _uri(path, queryParameters: queryParameters);
     return _authService.authorizedRequest((accessToken) async {
       final request = http.MultipartRequest('POST', uri)
         ..headers['Accept'] = 'application/json'
@@ -125,6 +143,7 @@ class AuthenticatedApiClient {
             file.fieldName,
             file.bytes,
             filename: file.filename,
+            contentType: _multipartMediaType(file.filename),
           ),
         );
       }

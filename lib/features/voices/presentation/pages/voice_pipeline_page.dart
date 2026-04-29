@@ -8,7 +8,7 @@ import '../../domain/voice_job.dart';
 import '../widgets/voice_capture_choice_sheet.dart';
 import '../widgets/voice_job_list_card.dart';
 
-/// 폴더(가로 스크롤) → 폴더 안 음성 목록
+/// 루트: 폴더 목록 + 미분류 음성 · 폴더 진입 시 그 안 음성 목록
 class VoicePipelinePage extends StatefulWidget {
   const VoicePipelinePage({
     super.key,
@@ -155,7 +155,12 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
   }
 
   List<VoiceJob> _jobsInScope() {
-    if (_scope == null) return [];
+    if (_scope == null) {
+      // 루트 `GET …/voice-folders/contents`와 같이 같은 화면에 폴더 + 이 위치 음성(미분류) 표시
+      return widget.jobs
+          .where((j) => j.folderId == VoiceFolder.uncategorizedId)
+          .toList();
+    }
     return widget.jobs.where((j) => j.folderId == _scope).toList();
   }
 
@@ -422,14 +427,14 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                     ),
                   ),
                 ),
-                if (_rootFoldersVisible.isEmpty)
+                if (_rootFoldersVisible.isEmpty && visible.isEmpty)
                   const SliverToBoxAdapter(
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(32, 8, 32, 24),
                       child: _EmptyRootFoldersHint(),
                     ),
-                  )
-                else
+                  ),
+                if (_rootFoldersVisible.isNotEmpty)
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
                     sliver: SliverList.separated(
@@ -447,6 +452,83 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                       },
                     ),
                   ),
+                if (visible.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '미분류 음성',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: YeolpumtaTheme.textSecondary.withValues(
+                                  alpha: 0.88,
+                                ),
+                              ),
+                            ),
+                          ),
+                          PopupMenuButton<VoiceJobListSort>(
+                            tooltip: '정렬',
+                            initialValue: _sort,
+                            onSelected: (v) => setState(() => _sort = v),
+                            itemBuilder: (context) => VoiceJobListSort.values
+                                .map(
+                                  (s) => PopupMenuItem(
+                                    value: s,
+                                    child: Row(
+                                      children: [
+                                        if (_sort == s)
+                                          const Icon(
+                                            Icons.check_rounded,
+                                            size: 18,
+                                            color: YeolpumtaTheme.accent,
+                                          )
+                                        else
+                                          const SizedBox(width: 18),
+                                        const SizedBox(width: 8),
+                                        Text(s.label),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            child: const Padding(
+                              padding: EdgeInsets.only(left: 4),
+                              child: Icon(
+                                Icons.sort_rounded,
+                                color: YeolpumtaTheme.textSecondary,
+                                size: 26,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                    sliver: SliverList.separated(
+                      itemCount: visible.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, i) {
+                        final j = visible[i];
+                        return VoiceJobListCard(
+                          job: j,
+                          folderLabel: _folderName(j.folderId),
+                          showFolderLine: _showFolderOnCards,
+                          onAdvance: () => widget.onAdvanceDemo(j.id),
+                          onDelete: () => widget.onDeleteJob(j.id),
+                          onMove: () => _showMoveSheet(j),
+                          onCardTap: () => widget.onListenTap(j),
+                        );
+                      },
+                    ),
+                  ),
+                ],
                 if (_rootFoldersVisible.isNotEmpty)
                   const SliverToBoxAdapter(
                     child: Padding(

@@ -346,8 +346,6 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
         _voiceCtaCoachActive = false;
         _recordButtonHoleLocal = null;
       });
-      await widget.onDirectRecordTap();
-      return;
     }
     await _openVoiceCaptureFromRoot();
   }
@@ -664,7 +662,8 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                 child: SpotlightCoachOverlay(
                   holeRect: _recordButtonHoleLocal!,
                   title: '시작은 여기!',
-                  body: '가장 많이 쓰는 건 이 초록 버튼이에요. 누르면 바로 녹음으로 갈게요.',
+                  body:
+                      '가장 많이 쓰는 건 이 초록 버튼이에요. 누르면 파일 업로드·직접 녹음 중 골라서 진행할 수 있어요.',
                   tapHint: '👉 한번 눌러볼래?',
                   holeRadius: 18,
                 ),

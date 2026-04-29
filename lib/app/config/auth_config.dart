@@ -2,13 +2,18 @@
 ///
 /// Update values here, or override them with `--dart-define`.
 ///
-/// Example:
+/// Default backend (when `AUTH_API_BASE` is not passed): [AuthConfig.deployedApiBaseUrl].
+///
+/// Override example (local Spring on your PC from Android emulator):
 /// `flutter run --dart-define=AUTH_API_BASE=http://10.0.2.2:9090`
+///
+/// Also:
 /// `--dart-define=GOOGLE_SERVER_CLIENT_ID=xxxx.apps.googleusercontent.com`
 /// `--dart-define=KAKAO_NATIVE_APP_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 ///
 /// Notes:
-/// - Android emulator should use `http://10.0.2.2:9090` instead of `localhost`.
+/// - Emulator cannot reach your PC as `localhost`; use `10.0.2.2` only for
+///   that local-dev case, not for the default deploy URL above.
 /// - Some native platform files still mirror a few values here:
 ///   `android/app/src/main/AndroidManifest.xml`
 ///   `ios/Runner/Info.plist`
@@ -16,9 +21,12 @@ abstract final class AuthConfig {
   // ---------------------------------------------------------------------------
   // Backend
   // ---------------------------------------------------------------------------
+  /// Deployed Spring API (used unless `AUTH_API_BASE` is set at compile time).
+  static const deployedApiBaseUrl = 'http://43.202.13.147:9090';
+
   static const apiBaseUrl = String.fromEnvironment(
     'AUTH_API_BASE',
-    defaultValue: 'http://43.202.13.147:9090',
+    defaultValue: deployedApiBaseUrl,
   );
 
   static const googleAuthPath = String.fromEnvironment(

@@ -6,6 +6,7 @@ import '../../../shared/presentation/pages/placeholder_page.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
 import '../../../shell/presentation/pages/main_shell_page.dart';
 import '../../../../app/app.dart';
+import '../../../../app/config/auth_config.dart';
 import '../../../../app/services/app_services.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../data/auth_api_client.dart';
@@ -130,8 +131,9 @@ class _LoginPageState extends State<LoginPage> {
     if (e.stage == GoogleAuthFailureStage.backend &&
         detail.contains('localhost')) {
       detail =
-          '$detail\n\nTip: Android emulator cannot use localhost for your PC. '
-          'Set AUTH_API_BASE to http://10.0.2.2:YOUR_PORT';
+          '$detail\n\nTip: Default API is the deploy server. If you overrode '
+          'AUTH_API_BASE to localhost, the Android emulator cannot reach your PC '
+          'that way — use http://10.0.2.2:YOUR_PORT for a local backend only.';
     }
     final stageLabel = switch (e.stage) {
       GoogleAuthFailureStage.google => 'Stage: Google (account / idToken)',
@@ -178,8 +180,9 @@ class _LoginPageState extends State<LoginPage> {
           title: 'Google sign-in was interrupted',
           body:
               'Common causes after picking an account:\n\n'
-              '• Wrong API URL on emulator: use http://10.0.2.2:9090 '
-              'instead of http://localhost:9090\n'
+              '• Default API is ${AuthConfig.deployedApiBaseUrl}. If you pointed '
+              'AUTH_API_BASE at localhost on an emulator, use '
+              'http://10.0.2.2:9090 for a PC-local server instead.\n'
               '• Server not running or blocked port / firewall\n'
               '• Android OAuth client: package name + debug SHA-1 must match\n\n'
               'Code: interrupted\n'

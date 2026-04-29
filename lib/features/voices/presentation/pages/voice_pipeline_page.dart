@@ -797,15 +797,6 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                       letterSpacing: -0.6,
                     ),
                   ),
-                  SizedBox(height: 6),
-                  Text(
-                    '음성 녹음으로 바로 추가하거나, 새 폴더로 정리할 수 있어요. 만든 폴더를 누르면 그 안의 목록·상태를 볼 수 있어요.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.4,
-                      color: YeolpumtaTheme.textSecondary,
-                    ),
-                  ),
                 ],
               ),
             ),

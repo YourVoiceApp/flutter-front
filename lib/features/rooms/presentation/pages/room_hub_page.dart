@@ -111,8 +111,9 @@ class _RoomHubPageState extends State<RoomHubPage> {
   }
 
   void _openRoom(Room room) {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
+    Navigator.of(context)
+        .push<String?>(
+      MaterialPageRoute<String?>(
         builder: (_) => RoomDetailPage(
           initialRoom: room,
           onRoomUpdated: (updated) {
@@ -123,7 +124,13 @@ class _RoomHubPageState extends State<RoomHubPage> {
           },
         ),
       ),
-    );
+    )
+        .then((deletedId) {
+      if (!mounted || deletedId == null) return;
+      setState(() {
+        _rooms = _rooms.where((r) => r.id != deletedId).toList();
+      });
+    });
   }
 
   Future<void> _openJoinFlow() async {

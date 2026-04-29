@@ -172,6 +172,9 @@ class AuthService {
     return refreshToken != null && refreshToken.isNotEmpty;
   }
 
+  /// User id from the last sign-in exchange (no network).
+  Future<int?> readSessionUserId() => _sessions.readUserId();
+
   Future<T> authorizedRequest<T>(
     Future<T> Function(String accessToken) action,
   ) {

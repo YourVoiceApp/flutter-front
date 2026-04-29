@@ -394,23 +394,23 @@ class VoiceLibraryRepository {
     VoiceUploadRequest request,
   ) async {
     if (await _authService.hasStoredSession()) {
+      /// Non-ASCII / odd paths in the multipart `filename=` break some servers;
+      /// file-picker uploads often use ASCII names — recordings often use Korean.
+      final uploadFilename = _clonedVoiceMultipartFilename(request.filename);
       final created = await _api.postMultipartObject(
         '/voices/cloned-voice',
         queryParameters: <String, String?>{
-          'name': request.name,
-          if (request.description != null && request.description!.isNotEmpty)
-            'description': request.description,
-        },
-        fields: <String, String>{
-          'name': request.name,
-          if (request.description != null && request.description!.isNotEmpty)
-            'description': request.description!,
+          'name': request.name.trim().isEmpty ? 'voice' : request.name.trim(),
+          'description': request.description?.trim() ?? '',
         },
         files: [
           MultipartPayloadFile(
             fieldName: 'files',
-            filename: request.filename,
+            filename: uploadFilename,
             bytes: request.bytes,
+            contentType: MultipartPayloadFile.contentTypeForAudioFilename(
+              uploadFilename,
+            ),
           ),
         ],
       );
@@ -508,8 +508,14 @@ class VoiceLibraryRepository {
     );
   }
 
-  Future<Uint8List> fetchGeneratedAudioBytes(int generatedAudioId) async {
+  /// 서버에서 합성한 오디오를 재생용으로 가져옵니다 (`GET .../stream`).
+  Future<Uint8List> fetchGeneratedAudioStream(int generatedAudioId) {
     return _api.getBytes('/voices/generated-audios/$generatedAudioId/stream');
+  }
+
+  /// 서버에서 합성한 오디오를 다운로드 형태로 가져옵니다 (`GET .../download`).
+  Future<Uint8List> fetchGeneratedAudioDownload(int generatedAudioId) {
+    return _api.getBytes('/voices/generated-audios/$generatedAudioId/download');
   }
 
   Future<VoiceLibrarySnapshot> moveJobToFolder(
@@ -628,6 +634,12 @@ class VoiceLibraryRepository {
     }
     return job.folderId == normalizedScopeId;
   }
+}
+
+String _clonedVoiceMultipartFilename(String userFilename) {
+  final lower = userFilename.toLowerCase();
+  final ext = lower.endsWith('.mp3') ? 'mp3' : 'wav';
+  return 'voice_${DateTime.now().millisecondsSinceEpoch}.$ext';
 }
 
 List<VoiceFolder> _remoteFoldersFromJson(dynamic raw, {String? parentId}) {

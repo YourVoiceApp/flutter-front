@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
@@ -18,13 +18,6 @@ abstract final class VoiceRecordLimits {
   /// 최대 허용 직전 [autoStopAdvanceSeconds]초에 녹음을 자동 종료함.
   static const int autoStopAdvanceSeconds = 3;
 }
-
-const List<String> kVoiceRecordingSampleScripts = [
-  '안녕하세요, 이름은 ○○이에요. 지금처럼 마이크에 가까이, 편하게 말해 보세요.',
-  '오늘은 날씨가 좋네요. 짧게라도 말하면서 목소리 톤이 잘 들어가도록 해 주세요.',
-  '좋아하는 과일은 수박이에요. 문장 속에 모음과 자음이 골고루 섞여 있도록 읽어도 좋아요.',
-  '내일 할 일 세 가지만 말한다면 일, 이, 삼이라고 순서대로 말할게요.',
-];
 
 /// 마이크 녹음 + 폴더 선택 → [VoiceUploadRequest]
 class VoiceRecordSheet extends StatefulWidget {
@@ -50,8 +43,6 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
 
   late String _folderId;
   final _newFolderCtrl = TextEditingController();
-  final _titleCtrl = TextEditingController();
-  final _descriptionCtrl = TextEditingController();
 
   bool _busy = false;
   bool _isRecording = false;
@@ -64,7 +55,6 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
   Stopwatch? _recordingStopwatch;
   Timer? _recordingTicker;
   bool _finishingRecording = false;
-  bool _scriptsExpanded = true;
 
   @override
   void initState() {
@@ -100,8 +90,6 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
   void dispose() {
     _recordingTicker?.cancel();
     _newFolderCtrl.dispose();
-    _titleCtrl.dispose();
-    _descriptionCtrl.dispose();
     _recorder.dispose();
     super.dispose();
   }
@@ -188,7 +176,14 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
     try {
       final encoder = await _pickEncoder();
       final path = await _outputPath(encoder);
-      await _recorder.start(RecordConfig(encoder: encoder), path: path);
+      await _recorder.start(
+        RecordConfig(
+          encoder: encoder,
+          sampleRate: 44100,
+          numChannels: 1,
+        ),
+        path: path,
+      );
       if (!mounted) return;
 
       _recordingStopwatch = Stopwatch()..start();
@@ -248,7 +243,7 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
 
       final enc = _encoderUsed ?? await _pickEncoder();
       final ext = _extensionForEncoder(enc);
-      final base = _sanitizedTitleBase();
+      final base = _defaultRecordingFileBase();
       final name = '$base.$ext';
 
       setState(() {
@@ -289,18 +284,9 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
     await _finishRecording(autofinishNearMax: false);
   }
 
-  String _sanitizedTitleBase() {
-    final raw = _titleCtrl.text.trim();
-    final cleaned =
-        raw.replaceAll(RegExp(r'''[\\/:*?"<>|\x00-\x1f]'''), '').trim();
-    if (cleaned.isEmpty) {
-      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      return '녹음_$stamp';
-    }
-    if (cleaned.length > 48) {
-      return cleaned.substring(0, 48);
-    }
-    return cleaned;
+  String _defaultRecordingFileBase() {
+    final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+    return '녹음_$stamp';
   }
 
   Future<void> _submitNewFolder() async {
@@ -348,14 +334,14 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
       return;
     }
 
-    final base = filename.contains('.') ? filename.split('.').first : filename;
-    final desc = _descriptionCtrl.text.trim();
+    final nameForApi = filename.contains('.')
+        ? filename.substring(0, filename.lastIndexOf('.'))
+        : filename;
     final request = VoiceUploadRequest(
       filename: filename,
       bytes: bytes,
       folderId: _folderId,
-      name: base,
-      description: desc.isEmpty ? null : desc,
+      name: nameForApi,
     );
     Navigator.of(context).pop<VoiceUploadRequest>(request);
   }
@@ -534,184 +520,6 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            Material(
-              color: YeolpumtaTheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                onTap: () =>
-                    setState(() => _scriptsExpanded = !_scriptsExpanded),
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.chat_bubble_outline_rounded,
-                        size: 20,
-                        color: YeolpumtaTheme.accent,
-                      ),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          '무엇을 말하면 좋을까요?',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        _scriptsExpanded
-                            ? Icons.expand_less_rounded
-                            : Icons.expand_more_rounded,
-                        color: YeolpumtaTheme.textSecondary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (_scriptsExpanded) ...[
-              const SizedBox(height: 8),
-              ...List.generate(kVoiceRecordingSampleScripts.length, (i) {
-                final line = kVoiceRecordingSampleScripts[i];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: YeolpumtaTheme.bg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: YeolpumtaTheme.divider),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 22,
-                          height: 22,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: YeolpumtaTheme.accentSoft,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '${i + 1}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: YeolpumtaTheme.accent,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            line,
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              height: 1.45,
-                              color: YeolpumtaTheme.textPrimary,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          constraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 36,
-                          ),
-                          padding: EdgeInsets.zero,
-                          tooltip: '복사',
-                          onPressed: () async {
-                            await Clipboard.setData(ClipboardData(text: line));
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('예시 문장을 복사했어요.'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.copy_rounded,
-                            size: 18,
-                            color: YeolpumtaTheme.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-            ],
-            const SizedBox(height: 16),
-            const Text(
-              '음성 이름',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: YeolpumtaTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _titleCtrl,
-              enabled: !_isRecording && !_busy,
-              maxLength: 48,
-              decoration: InputDecoration(
-                counterText: '',
-                hintText: '예: 엄마 목소리, 발표용 등',
-                hintStyle: const TextStyle(color: YeolpumtaTheme.textSecondary),
-                filled: true,
-                fillColor: YeolpumtaTheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: YeolpumtaTheme.divider),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: YeolpumtaTheme.divider),
-                ),
-                isDense: true,
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              '설명 (선택)',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: YeolpumtaTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _descriptionCtrl,
-              enabled: !_isRecording && !_busy,
-              maxLines: 2,
-              maxLength: 120,
-              decoration: InputDecoration(
-                hintText: '톤·용도 등을 적어 두면 나중에 찾기 쉬워요.',
-                hintStyle: const TextStyle(color: YeolpumtaTheme.textSecondary),
-                filled: true,
-                fillColor: YeolpumtaTheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: YeolpumtaTheme.divider),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: YeolpumtaTheme.divider),
-                ),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 20),
             FilledButton.tonal(
               onPressed: _busy ? null : _toggleRecording,
               style: FilledButton.styleFrom(

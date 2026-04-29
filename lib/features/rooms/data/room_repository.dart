@@ -1,5 +1,6 @@
 import '../../../app/services/app_services.dart';
 import '../../../app/services/authenticated_api_client.dart';
+import '../../auth/data/auth_api_client.dart';
 import '../../auth/data/auth_service.dart';
 import '../../voices/data/voice_library_repository.dart';
 import '../../voices/domain/voice_job.dart';
@@ -25,6 +26,12 @@ class RoomRepository {
   final VoiceLibraryRepository _voiceLibraryRepository;
 
   Future<bool> get usesRemote async => _authService.hasStoredSession();
+
+  Future<bool> isRoomOwner(Room room) async {
+    final uid = await _authService.readSessionUserId();
+    if (uid == null || room.ownerId == null) return false;
+    return uid == room.ownerId;
+  }
 
   Future<List<Room>> loadRooms() async {
     if (!await usesRemote) return _mockRooms();
@@ -64,27 +71,76 @@ class RoomRepository {
             ? 'INVITE_CODE_WITH_PASSWORD'
             : 'INVITE_CODE_ONLY',
         'maxParticipants': maxParticipants,
-        'password': usePassword ? password : null,
+        'password': usePassword ? (password ?? '') : '',
       },
     );
     return _roomFromJson(created);
   }
 
+  Future<Room> updateRoom({
+    required String roomId,
+    required String title,
+    required bool usePassword,
+    String? password,
+    int maxParticipants = 3,
+  }) async {
+    if (!await usesRemote) {
+      throw UnsupportedError('로그인 후에만 방을 수정할 수 있어요.');
+    }
+    final updated = await _api.putJsonObject(
+      '/room/$roomId',
+      body: <String, dynamic>{
+        'title': title,
+        'joinPolicy': usePassword
+            ? 'INVITE_CODE_WITH_PASSWORD'
+            : 'INVITE_CODE_ONLY',
+        'maxParticipants': maxParticipants,
+        'password': usePassword ? (password ?? '') : '',
+      },
+    );
+    return _roomFromJson(updated);
+  }
+
+  Future<void> deleteRoom(String roomId) async {
+    if (!await usesRemote) {
+      throw UnsupportedError('로그인 후에만 방을 삭제할 수 있어요.');
+    }
+    await _api.deleteNoContent('/room/$roomId');
+  }
+
   Future<Room> loadRoomDetail(Room room) async {
     if (!await usesRemote) return room;
-    final detail = await _api.getJsonObject('/room/${room.id}');
-    final members = await _api.getJsonList('/room/${room.id}/members');
-    final shares = await _api.getJsonList('/room/${room.id}/voice-shares');
-    return _roomFromJson(detail).copyWith(
-      members: members
-          .whereType<Map<String, dynamic>>()
-          .map(_memberFromJson)
-          .toList(growable: false),
-      sharedVoices: shares
-          .whereType<Map<String, dynamic>>()
-          .map(_sharedVoiceFromJson)
-          .toList(growable: false),
-    );
+    Map<String, dynamic> detailJson;
+    try {
+      detailJson = await _api.getJsonObject('/room/${room.id}');
+    } on AuthApiException catch (e) {
+      if (e.statusCode == 404) return room;
+      rethrow;
+    }
+    var result = _roomFromJson(detailJson);
+    try {
+      final members = await _api.getJsonList('/room/${room.id}/members');
+      result = result.copyWith(
+        members: members
+            .whereType<Map<String, dynamic>>()
+            .map(_memberFromJson)
+            .toList(growable: false),
+      );
+    } on AuthApiException catch (_) {
+      // Optional endpoint — list/detail may omit members.
+    }
+    try {
+      final shares = await _api.getJsonList('/room/${room.id}/voice-shares');
+      result = result.copyWith(
+        sharedVoices: shares
+            .whereType<Map<String, dynamic>>()
+            .map(_sharedVoiceFromJson)
+            .toList(growable: false),
+      );
+    } on AuthApiException catch (_) {
+      // Optional endpoint.
+    }
+    return result;
   }
 
   Future<Room> joinRoom({
@@ -92,13 +148,13 @@ class RoomRepository {
     String? password,
   }) async {
     if (!await usesRemote) {
-      throw UnsupportedError('로그인 상태에서는 원격 방 입장을 사용해야 해요.');
+      throw UnsupportedError('로그인이 필요해요.');
     }
     final joined = await _api.postJsonObject(
       '/room/join',
       body: <String, dynamic>{
         'inviteCode': inviteCode,
-        if (password != null && password.isNotEmpty) 'password': password,
+        'password': password ?? '',
       },
     );
     return _roomFromJson(joined);
@@ -114,6 +170,8 @@ class RoomRepository {
   Future<Room> syncSharedVoices({
     required Room room,
     required Set<String> selectedVoiceIds,
+    RoomVoiceAccessScope accessScopeForSelection =
+        RoomVoiceAccessScope.listenOnly,
   }) async {
     if (!await usesRemote) {
       final voices = await loadSharableVoices();
@@ -126,6 +184,7 @@ class RoomRepository {
               voiceTitle: voice.fileName,
               ownerName: '나',
               subtitle: voice.origin.label,
+              accessScope: accessScopeForSelection,
             ),
           )
           .toList(growable: false);
@@ -141,25 +200,41 @@ class RoomRepository {
       for (final share in existingShares) share.externalVoiceId: share,
     };
 
-    final toAdd = selectedVoiceIds
-        .where((id) => !existingByExternalId.containsKey(id))
-        .toList(growable: false);
+    final wireScope = _accessScopeToWire(accessScopeForSelection);
+
     final toRemove = existingShares
         .where((share) => !selectedVoiceIds.contains(share.externalVoiceId))
         .toList(growable: false);
-
-    if (toAdd.isNotEmpty) {
-      await _api.postJsonObject(
-        '/room/${room.id}/voice-shares',
-        body: <String, dynamic>{
-          'externalVoiceIds': toAdd,
-          'accessScope': 'LISTEN_ONLY',
-        },
-      );
-    }
+    final toAdd = selectedVoiceIds
+        .where((id) => !existingByExternalId.containsKey(id))
+        .toList(growable: false);
+    final toUpdateScope = existingShares
+        .where(
+          (share) =>
+              selectedVoiceIds.contains(share.externalVoiceId) &&
+              share.accessScope != accessScopeForSelection,
+        )
+        .toList(growable: false);
 
     for (final share in toRemove) {
       await _api.deleteNoContent('/room/${room.id}/voice-shares/${share.id}');
+    }
+
+    for (final share in toUpdateScope) {
+      await _api.putJsonObject(
+        '/room/${room.id}/voice-shares/${share.id}',
+        body: <String, dynamic>{'accessScope': wireScope},
+      );
+    }
+
+    if (toAdd.isNotEmpty) {
+      await _api.postJsonList(
+        '/room/${room.id}/voice-shares',
+        body: <String, dynamic>{
+          'externalVoiceIds': toAdd,
+          'accessScope': wireScope,
+        },
+      );
     }
 
     return loadRoomDetail(room);
@@ -196,9 +271,13 @@ class RoomRepository {
 }
 
 Room _roomFromJson(Map<String, dynamic> json) {
+  final name = json['name'] as String?;
+  final title = json['title'] as String?;
+  final resolvedName =
+      (name != null && name.isNotEmpty) ? name : (title ?? '');
   return Room(
     id: '${json['id']}',
-    name: json['name'] as String? ?? '',
+    name: resolvedName,
     inviteCode: '${json['inviteCode'] ?? ''}',
     ownerId: (json['ownerId'] as num?)?.toInt(),
     joinPolicy: _joinPolicyFromWire(json['joinPolicy'] as String?),
@@ -251,8 +330,17 @@ RoomJoinPolicy _joinPolicyFromWire(String? wire) {
 
 RoomVoiceAccessScope _accessScopeFromWire(String? wire) {
   return switch ((wire ?? '').toUpperCase()) {
+    'LISTEN_ONLY' => RoomVoiceAccessScope.listenOnly,
     'SYNTHESIS_ALLOWED' => RoomVoiceAccessScope.synthesisAllowed,
     'DOWNLOAD_ALLOWED' => RoomVoiceAccessScope.downloadAllowed,
     _ => RoomVoiceAccessScope.listenOnly,
+  };
+}
+
+String _accessScopeToWire(RoomVoiceAccessScope scope) {
+  return switch (scope) {
+    RoomVoiceAccessScope.listenOnly => 'LISTEN_ONLY',
+    RoomVoiceAccessScope.synthesisAllowed => 'SYNTHESIS_ALLOWED',
+    RoomVoiceAccessScope.downloadAllowed => 'DOWNLOAD_ALLOWED',
   };
 }

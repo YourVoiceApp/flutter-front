@@ -12,6 +12,20 @@ import '../widgets/shared_voice_play_sheet.dart';
 
 typedef RoomUpdated = void Function(Room room);
 
+class _RoomEditResult {
+  const _RoomEditResult({
+    required this.title,
+    required this.usePassword,
+    required this.password,
+    required this.maxParticipants,
+  });
+
+  final String title;
+  final bool usePassword;
+  final String password;
+  final int maxParticipants;
+}
+
 /// 방 안: 멤버 · 공유 음성 · 내 음성 올리기 (UI)
 class RoomDetailPage extends StatefulWidget {
   const RoomDetailPage({
@@ -34,6 +48,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   late Room _room;
   List<VoiceJob> _myVoices = const [];
   bool _loading = true;
+  bool _isOwner = false;
   bool _shareFabCoach = false;
   Rect? _shareFabHole;
 
@@ -104,19 +119,262 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
 
   Future<void> _load() async {
     try {
+      final remote = await _roomRepository.usesRemote;
       final detail = await _roomRepository.loadRoomDetail(_room);
       final myVoices = await _roomRepository.loadSharableVoices();
       if (!mounted) return;
+      final owner = remote && await _roomRepository.isRoomOwner(detail);
       setState(() {
         _room = detail;
         _myVoices = myVoices;
         _loading = false;
+        _isOwner = owner;
       });
       _notifyParent();
       if (_shareFabCoach) _scheduleFabMeasure();
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      var owner = false;
+      try {
+        if (await _roomRepository.usesRemote) {
+          owner = await _roomRepository.isRoomOwner(_room);
+        }
+      } catch (_) {}
+      setState(() {
+        _loading = false;
+        _isOwner = owner;
+      });
+    }
+  }
+
+  Future<void> _editRoom() async {
+    final nameCtrl = TextEditingController(text: _room.name);
+    final passCtrl = TextEditingController();
+    final maxCtrl = TextEditingController(
+      text: '${_room.maxParticipants > 0 ? _room.maxParticipants : 3}',
+    );
+    var usePass = _room.requiresPassword;
+
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    _RoomEditResult? result;
+    try {
+      result = await showDialog<_RoomEditResult>(
+        context: context,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (ctx, setLocal) {
+              return AlertDialog(
+                backgroundColor: YeolpumtaTheme.surface,
+                surfaceTintColor: Colors.transparent,
+                title: Text(
+                  '방 정보 수정',
+                  style: TextStyle(
+                    color: YeolpumtaTheme.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: nameCtrl,
+                        decoration: fieldDecoration(
+                          hint: '방 이름',
+                          icon: Icons.meeting_room_outlined,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          '비밀번호로 입장만 허용',
+                          style: TextStyle(
+                            color: YeolpumtaTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        value: usePass,
+                        activeThumbColor: YeolpumtaTheme.accent,
+                        activeTrackColor: YeolpumtaTheme.accent.withValues(
+                          alpha: 0.35,
+                        ),
+                        onChanged: (v) => setLocal(() => usePass = v),
+                      ),
+                      if (usePass) ...[
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: passCtrl,
+                          obscureText: true,
+                          decoration: fieldDecoration(
+                            hint: _room.requiresPassword
+                                ? '새 비밀번호 (4자 이상)'
+                                : '방 비밀번호',
+                            icon: Icons.password_rounded,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: maxCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: fieldDecoration(
+                          hint: '최대 참가 인원',
+                          icon: Icons.group_outlined,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(
+                      '취소',
+                      style: TextStyle(
+                        color: YeolpumtaTheme.accent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: () {
+                      final name = nameCtrl.text.trim();
+                      if (name.isEmpty) {
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            const SnackBar(content: Text('방 이름을 입력해 주세요.')),
+                          );
+                        return;
+                      }
+                      if (usePass && passCtrl.text.trim().length < 4) {
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            const SnackBar(
+                              content: Text('비밀번호는 4자 이상 입력해 주세요.'),
+                            ),
+                          );
+                        return;
+                      }
+                      final maxVal =
+                          int.tryParse(maxCtrl.text.trim()) ??
+                          (_room.maxParticipants > 0 ? _room.maxParticipants : 3);
+                      if (maxVal < 1) {
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(
+                            const SnackBar(
+                              content: Text('최대 인원은 1 이상이어야 해요.'),
+                            ),
+                          );
+                        return;
+                      }
+                      Navigator.pop(
+                        ctx,
+                        _RoomEditResult(
+                          title: name,
+                          usePassword: usePass,
+                          password: passCtrl.text.trim(),
+                          maxParticipants: maxVal,
+                        ),
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: YeolpumtaTheme.accent,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('저장'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      nameCtrl.dispose();
+      passCtrl.dispose();
+      maxCtrl.dispose();
+    }
+
+    if (result == null || !mounted) return;
+
+    try {
+      final updated = await _roomRepository.updateRoom(
+        roomId: _room.id,
+        title: result.title,
+        usePassword: result.usePassword,
+        password: result.usePassword ? result.password : null,
+        maxParticipants: result.maxParticipants,
+      );
+      if (!mounted) return;
+      setState(() => _room = updated);
+      _notifyParent();
+      showToast(context, '방 정보를 저장했어요.');
+    } catch (e) {
+      if (!mounted) return;
+      showToast(context, '$e');
+    }
+  }
+
+  Future<void> _deleteRoom() async {
+    final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: YeolpumtaTheme.surface,
+            surfaceTintColor: Colors.transparent,
+            title: Text(
+              '방 삭제',
+              style: TextStyle(
+                color: YeolpumtaTheme.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            content: Text(
+              '「${_room.name}」방을 삭제할까요? 이 작업은 되돌릴 수 없어요.',
+              style: TextStyle(
+                color: YeolpumtaTheme.textSecondary,
+                height: 1.45,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(
+                  '취소',
+                  style: TextStyle(
+                    color: YeolpumtaTheme.accent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red.shade600,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('삭제'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!ok || !mounted) return;
+
+    try {
+      await _roomRepository.deleteRoom(_room.id);
+      if (!mounted) return;
+      Navigator.of(context).pop<String>(_room.id);
+    } catch (e) {
+      if (!mounted) return;
+      showToast(context, '$e');
     }
   }
 
@@ -124,6 +382,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     final chosen = <String>{
       for (final v in _room.sharedVoices) v.externalVoiceId,
     };
+    var shareAccessScope = RoomVoiceAccessScope.listenOnly;
+    if (_room.sharedVoices.isNotEmpty) {
+      final scopes = _room.sharedVoices.map((v) => v.accessScope).toSet();
+      if (scopes.length == 1) {
+        final only = scopes.first;
+        shareAccessScope = only == RoomVoiceAccessScope.downloadAllowed
+            ? RoomVoiceAccessScope.downloadAllowed
+            : RoomVoiceAccessScope.listenOnly;
+      }
+    }
 
     showModalBottomSheet<void>(
       context: context,
@@ -171,6 +439,51 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     style: TextStyle(
                       color: YeolpumtaTheme.textSecondary,
                       fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    '공유 권한',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: YeolpumtaTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SegmentedButton<RoomVoiceAccessScope>(
+                    style: SegmentedButton.styleFrom(
+                      backgroundColor: YeolpumtaTheme.iconMutedBg,
+                      selectedBackgroundColor: YeolpumtaTheme.accentSoft,
+                      selectedForegroundColor: YeolpumtaTheme.accent,
+                      foregroundColor: YeolpumtaTheme.textPrimary,
+                      side: const BorderSide(color: YeolpumtaTheme.outline),
+                    ),
+                    segments: const [
+                      ButtonSegment(
+                        value: RoomVoiceAccessScope.listenOnly,
+                        label: Text('듣기 전용'),
+                        icon: Icon(Icons.hearing_rounded, size: 18),
+                      ),
+                      ButtonSegment(
+                        value: RoomVoiceAccessScope.downloadAllowed,
+                        label: Text('다운로드 허용'),
+                        icon: Icon(Icons.download_rounded, size: 18),
+                      ),
+                    ],
+                    selected: {shareAccessScope},
+                    onSelectionChanged: (s) {
+                      if (s.isEmpty) return;
+                      setModalState(() => shareAccessScope = s.first);
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '선택한 모든 공유 항목에 같은 권한이 적용돼요. (이미 공유된 항목은 권한만 바꿀 수 있어요.)',
+                    style: TextStyle(
+                      color: YeolpumtaTheme.textSecondary,
+                      fontSize: 12,
                       height: 1.35,
                     ),
                   ),
@@ -235,6 +548,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         final updated = await _roomRepository.syncSharedVoices(
                           room: _room,
                           selectedVoiceIds: chosen,
+                          accessScopeForSelection: shareAccessScope,
                         );
                         if (!mounted) return;
                         setState(() => _room = updated);
@@ -283,6 +597,37 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       appBar: AppBar(
         title: Text(_room.name),
         actions: [
+          if (_isOwner && !_loading)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  _editRoom();
+                } else if (value == 'delete') {
+                  _deleteRoom();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Text(
+                    '방 정보 수정',
+                    style: TextStyle(color: YeolpumtaTheme.textPrimary),
+                  ),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text(
+                    '방 삭제',
+                    style: TextStyle(
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           IconButton(
             tooltip: '초대 정보',
             onPressed: () {
@@ -404,8 +749,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       ),
                       backgroundColor: YeolpumtaTheme.surface,
                       side: const BorderSide(color: YeolpumtaTheme.outline),
-                      onPressed: () =>
-                          showToast(context, '초대 코드 입장 API는 아직 문서에 없습니다.'),
+                      onPressed: () => showToast(
+                        context,
+                        '친구에게 초대 코드를 알려 주면, 방 탭에서 「방 입장」으로 들어올 수 있어요.',
+                      ),
                     ),
                   ],
                 ),

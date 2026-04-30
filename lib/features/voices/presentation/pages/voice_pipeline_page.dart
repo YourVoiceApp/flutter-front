@@ -7,6 +7,7 @@ import '../../domain/voice_folder.dart';
 import '../../domain/voice_job.dart';
 import '../widgets/voice_capture_choice_sheet.dart';
 import '../widgets/voice_job_list_card.dart';
+import '../widgets/voice_rename_dialog.dart';
 
 /// 루트: 폴더 목록 + 미분류 음성 · 폴더 진입 시 그 안 음성 목록
 class VoicePipelinePage extends StatefulWidget {
@@ -21,6 +22,7 @@ class VoicePipelinePage extends StatefulWidget {
     required this.onAdvanceDemo,
     required this.onDeleteJob,
     required this.onMoveJob,
+    required this.onRenameJob,
     required this.onListenTap,
   });
 
@@ -38,6 +40,9 @@ class VoicePipelinePage extends StatefulWidget {
   final void Function(String id) onAdvanceDemo;
   final void Function(String id) onDeleteJob;
   final void Function(String jobId, String folderId) onMoveJob;
+
+  /// 서버 `PATCH /voices/{ownershipId}` — 표시 이름 변경
+  final Future<void> Function(String jobId, String newName) onRenameJob;
 
   /// 카드 탭 시 듣기 화면으로 (완료 여부는 콜백 안에서 처리)
   final void Function(VoiceJob job) onListenTap;
@@ -298,6 +303,18 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
     }
   }
 
+  Future<void> _showRenameDialog(VoiceJob job) async {
+    final name = await showVoiceRenameDialog(context, initialName: job.fileName);
+    if (!mounted || name == null) return;
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이름을 입력해 주세요.')),
+      );
+      return;
+    }
+    await widget.onRenameJob(job.id, name);
+  }
+
   /// 루트 등 폴더 미선택이면 null
   String? get _captureInitialFolderId {
     if (_scope == null) return null;
@@ -523,6 +540,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                           onAdvance: () => widget.onAdvanceDemo(j.id),
                           onDelete: () => widget.onDeleteJob(j.id),
                           onMove: () => _showMoveSheet(j),
+                          onRename: () => _showRenameDialog(j),
                           onCardTap: () => widget.onListenTap(j),
                         );
                       },
@@ -727,6 +745,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                           onAdvance: () => widget.onAdvanceDemo(j.id),
                           onDelete: () => widget.onDeleteJob(j.id),
                           onMove: () => _showMoveSheet(j),
+                          onRename: () => _showRenameDialog(j),
                           onCardTap: () => widget.onListenTap(j),
                         );
                       },

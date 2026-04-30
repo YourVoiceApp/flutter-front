@@ -7,6 +7,7 @@ import '../../../voices/data/voice_library_repository.dart';
 import '../../../voices/domain/voice_folder.dart';
 import '../../../voices/domain/voice_job.dart';
 import '../../../voices/presentation/widgets/voice_job_list_card.dart';
+import '../../../voices/presentation/widgets/voice_rename_dialog.dart';
 import 'account_detail_page.dart';
 
 /// 프로필 + 보유 음성(출처별) — 데모
@@ -18,6 +19,7 @@ class MyPage extends StatefulWidget {
     required this.folders,
     required this.onAdvanceDemo,
     required this.onDeleteJob,
+    required this.onRenameJob,
     required this.onMoveJob,
     this.isGuestMode = false,
     this.onListenTap,
@@ -30,6 +32,7 @@ class MyPage extends StatefulWidget {
   final List<VoiceFolder> folders;
   final Future<void> Function(String id) onAdvanceDemo;
   final Future<void> Function(String id) onDeleteJob;
+  final Future<void> Function(String jobId, String newName) onRenameJob;
   final Future<void> Function(String jobId, String folderId) onMoveJob;
   final bool isGuestMode;
 
@@ -162,6 +165,19 @@ class _MyPageState extends State<MyPage> {
       await widget.onMoveJob(job.id, id);
       await _reload();
     }
+  }
+
+  Future<void> _showRenameDialog(VoiceJob job) async {
+    final name = await showVoiceRenameDialog(context, initialName: job.fileName);
+    if (!mounted || name == null) return;
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이름을 입력해 주세요.')),
+      );
+      return;
+    }
+    await widget.onRenameJob(job.id, name);
+    await _reload();
   }
 
   @override
@@ -471,6 +487,7 @@ class _MyPageState extends State<MyPage> {
                               await _reload();
                             },
                             onMove: () => _showMoveSheet(j),
+                            onRename: () => _showRenameDialog(j),
                             onCardTap: widget.onListenTap != null
                                 ? () => widget.onListenTap!(j)
                                 : null,

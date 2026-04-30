@@ -252,6 +252,17 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     }
   }
 
+  Future<void> _renameJob(String jobId, String newName) async {
+    try {
+      final snap = await _repo.renameVoiceJob(_data, jobId, newName);
+      if (!mounted) return;
+      setState(() => _data = snap);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   void _openListen(VoiceJob job) {
     final sorted = List<VoiceJob>.from(_data.jobs)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -302,6 +313,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
           folders: _data.folders,
           onAdvanceDemo: _advanceDemo,
           onDeleteJob: _deleteJob,
+          onRenameJob: _renameJob,
           onMoveJob: _moveJob,
           onListenTap: _openListen,
           onAccountDeleted: () {
@@ -523,6 +535,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
                   onAdvanceDemo: _advanceDemo,
                   onDeleteJob: _deleteJob,
                   onMoveJob: _moveJob,
+                  onRenameJob: _renameJob,
                   onListenTap: _openListen,
                 ),
                 const RoomHubPage(embeddedInMainShell: true),

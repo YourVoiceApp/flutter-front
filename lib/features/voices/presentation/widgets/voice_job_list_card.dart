@@ -85,6 +85,7 @@ class VoiceJobListCard extends StatelessWidget {
     required this.onAdvance,
     required this.onDelete,
     required this.onMove,
+    required this.onRename,
     this.showMenu = true,
     this.onCardTap,
   });
@@ -95,6 +96,7 @@ class VoiceJobListCard extends StatelessWidget {
   final VoidCallback onAdvance;
   final VoidCallback onDelete;
   final VoidCallback onMove;
+  final VoidCallback onRename;
   final bool showMenu;
 
   /// 카드 본문 탭(메뉴·다음 단계 버튼과 별개)
@@ -258,10 +260,15 @@ class VoiceJobListCard extends StatelessWidget {
                                 color: YeolpumtaTheme.textSecondary,
                               ),
                               onSelected: (v) {
+                                if (v == 'rename') onRename();
                                 if (v == 'move') onMove();
                                 if (v == 'delete') onDelete();
                               },
                               itemBuilder: (context) => const [
+                                PopupMenuItem(
+                                  value: 'rename',
+                                  child: Text('이름 바꾸기'),
+                                ),
                                 PopupMenuItem(
                                   value: 'move',
                                   child: Text('다른 폴더로'),

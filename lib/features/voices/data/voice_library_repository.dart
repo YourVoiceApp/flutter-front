@@ -456,6 +456,45 @@ class VoiceLibraryRepository {
     return next;
   }
 
+  /// 서버: `PATCH /voices/{ownershipId}` — 표시 제목(`title`) 변경
+  Future<VoiceLibrarySnapshot> renameVoiceJob(
+    VoiceLibrarySnapshot current,
+    String jobId,
+    String newName,
+  ) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) throw ArgumentError('이름이 비었어요');
+
+    if (await _authService.hasStoredSession()) {
+      VoiceJob? target;
+      for (final job in current.jobs) {
+        if (job.id == jobId) {
+          target = job;
+          break;
+        }
+      }
+      final ownershipId = target?.ownershipId;
+      if (ownershipId == null) {
+        throw StateError('이름을 바꿀 음성의 ownershipId가 없어요.');
+      }
+      await _api.patchJsonObject(
+        '/voices/$ownershipId',
+        body: <String, dynamic>{'name': trimmed},
+      );
+      return _loadRemote();
+    }
+
+    VoiceJob? target;
+    for (final job in current.jobs) {
+      if (job.id == jobId) {
+        target = job;
+        break;
+      }
+    }
+    if (target == null) throw StateError('음성을 찾을 수 없어요');
+    return updateJob(current, target.copyWith(fileName: trimmed));
+  }
+
   Future<VoiceLibrarySnapshot> deleteJob(
     VoiceLibrarySnapshot current,
     String jobId,

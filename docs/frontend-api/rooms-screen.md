@@ -193,9 +193,16 @@ Request:
 ```json
 {
   "externalVoiceIds": ["voice_abc", "voice_xyz"],
-  "accessScope": "LISTEN_ONLY"
+  "accessScope": "LISTEN_ONLY",
+  "shareDisplayTitlesByExternalVoiceId": {
+    "voice_abc": "방에서 보일 이름",
+    "voice_xyz": "다른 표시 이름"
+  }
 }
 ```
+
+- `shareDisplayTitlesByExternalVoiceId` 키는 `externalVoiceIds`와 같은 voiceKey(외부 음성 id)입니다.
+- 생략하거나 특정 항목만 줄 수 있습니다(미전달 분은 서버 규칙에 따름). 프론트는 새로 추가하는 각 id에 대해 맵을 채워 보냅니다.
 
 Response:
 
@@ -259,9 +266,12 @@ Request:
 
 ```json
 {
-  "accessScope": "DOWNLOAD_ALLOWED"
+  "accessScope": "DOWNLOAD_ALLOWED",
+  "shareDisplayTitle": "방에서 보일 이름"
 }
 ```
+
+- `shareDisplayTitle`: 이 방 공유 목록에 보이는 이름(필수 여부는 서버 정책에 따름).
 
 Response:
 
@@ -291,3 +301,21 @@ Response:
 - 상세 진입 후 공유 음성 영역은 `GET /room/{roomId}/voice-shares`
 - 방 생성/수정 시 프론트 모델은 `title`, 화면 표시 모델은 `name` 으로 매핑 필요
 - `voiceKey` 와 `externalVoiceId` 는 현재 동일 값으로 내려옵니다
+
+## 11. 방 공유 음성으로 문장 합성 (소비자)
+
+클라이언트는 아래를 **가정**으로 연동합니다. 경로가 다르면 백엔드 스펙에 맞춰 수정하세요.
+
+- `POST /room/{roomId}/voice-shares/{shareId}/text-to-speech`
+- Request body: `{ "text": "읽을 문장" }`
+- Response: 보유 음성 TTS(`POST /voices/{ownershipId}/text-to-speech`)와 동일하게 `speechRequestId`, `generatedAudioId`, `streamUrl`, `downloadUrl` 등 사용
+
+합성 결과 스트림/다운로드는 기존과 같이:
+
+- `GET /voices/generated-audios/{generatedAudioId}/stream`
+- `GET /voices/generated-audios/{generatedAudioId}/download`
+
+### 권한(`accessScope`)별 프론트 동작 요약
+
+- `LISTEN_ONLY`: 서버 클론 합성 호출 없이 **기기 TTS**로만 재생
+- `SYNTHESIS_ALLOWED` / `DOWNLOAD_ALLOWED`: 위 합성 API 호출 후 스트림 재생 (실패 시 기기 TTS로 대체 안내 가능)

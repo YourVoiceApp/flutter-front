@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../app/services/app_services.dart';
 import '../../../app/services/authenticated_api_client.dart';
 import '../../auth/data/auth_api_client.dart';
@@ -137,8 +139,9 @@ class RoomRepository {
             .map(_sharedVoiceFromJson)
             .toList(growable: false),
       );
-    } on AuthApiException catch (_) {
-      // Optional endpoint.
+    } on AuthApiException catch (e) {
+      // 404만 목록 없음으로 처리하고, 그 외 실패는 디버깅·복구를 위해 전파합니다.
+      if (e.statusCode != 404) rethrow;
     }
     return result;
   }
@@ -172,16 +175,22 @@ class RoomRepository {
     required Set<String> selectedVoiceIds,
     RoomVoiceAccessScope accessScopeForSelection =
         RoomVoiceAccessScope.listenOnly,
+    /// 음성별 방에 보일 이름(voiceKey 등 external id 키). 비어 있거나 키 없으면 라이브러리 파일명 사용.
+    Map<String, String>? shareDisplayTitlesByExternalVoiceId,
   }) async {
     if (!await usesRemote) {
       final voices = await loadSharableVoices();
+      final titleFor = shareDisplayTitlesByExternalVoiceId ?? {};
       final selected = voices
           .where((voice) => selectedVoiceIds.contains(voice.id))
           .map(
             (voice) => RoomSharedVoice(
               id: voice.id,
               externalVoiceId: voice.id,
-              voiceTitle: voice.fileName,
+              voiceTitle: () {
+                final t = titleFor[voice.id]?.trim() ?? '';
+                return t.isEmpty ? voice.fileName : t;
+              }(),
               ownerName: '나',
               subtitle: voice.origin.label,
               accessScope: accessScopeForSelection,
@@ -190,6 +199,11 @@ class RoomRepository {
           .toList(growable: false);
       return room.copyWith(sharedVoices: selected);
     }
+
+    final sharable = await loadSharableVoices();
+    final fileNameById = {
+      for (final v in sharable) v.id: v.fileName,
+    };
 
     final existing = await _api.getJsonList('/room/${room.id}/voice-shares');
     final existingShares = existing
@@ -208,36 +222,154 @@ class RoomRepository {
     final toAdd = selectedVoiceIds
         .where((id) => !existingByExternalId.containsKey(id))
         .toList(growable: false);
-    final toUpdateScope = existingShares
-        .where(
-          (share) =>
-              selectedVoiceIds.contains(share.externalVoiceId) &&
-              share.accessScope != accessScopeForSelection,
-        )
-        .toList(growable: false);
 
     for (final share in toRemove) {
       await _api.deleteNoContent('/room/${room.id}/voice-shares/${share.id}');
     }
 
-    for (final share in toUpdateScope) {
+    /// `PUT …/voice-shares/{shareId}` — `accessScope` + 방 표시 이름 `shareDisplayTitle`
+    for (final share in existingShares) {
+      if (!selectedVoiceIds.contains(share.externalVoiceId)) continue;
+      final desiredTitle = _resolveShareDisplayTitle(
+        voiceId: share.externalVoiceId,
+        customTitles: shareDisplayTitlesByExternalVoiceId,
+        fileNameById: fileNameById,
+      );
+      final scopeChanged = share.accessScope != accessScopeForSelection;
+      final titleChanged =
+          desiredTitle.trim() != share.voiceTitle.trim();
+      if (!scopeChanged && !titleChanged) continue;
+
       await _api.putJsonObject(
         '/room/${room.id}/voice-shares/${share.id}',
-        body: <String, dynamic>{'accessScope': wireScope},
+        body: <String, dynamic>{
+          'accessScope': wireScope,
+          'shareDisplayTitle': desiredTitle,
+        },
       );
     }
 
     if (toAdd.isNotEmpty) {
+      final titleMap = <String, String>{
+        for (final id in toAdd)
+          id: _resolveShareDisplayTitle(
+            voiceId: id,
+            customTitles: shareDisplayTitlesByExternalVoiceId,
+            fileNameById: fileNameById,
+          ),
+      };
       await _api.postJsonList(
         '/room/${room.id}/voice-shares',
         body: <String, dynamic>{
           'externalVoiceIds': toAdd,
           'accessScope': wireScope,
+          'shareDisplayTitlesByExternalVoiceId': titleMap,
         },
       );
     }
 
+    /// POST 직후 `GET …/voice-shares` 가 아직 빈 목록을 줄 때가 있어, 반영까지 폴링합니다.
+    return _reloadRoomDetailWhenSharesInclude(room, mustIncludeVoiceKeys: toAdd);
+  }
+
+  /// 공유 레코드 한 건 수정: `PUT /room/{roomId}/voice-shares/{shareId}`
+  Future<Room> updateRoomSharedVoice({
+    required Room room,
+    required String shareRecordId,
+    required RoomVoiceAccessScope accessScope,
+    required String shareDisplayTitle,
+  }) async {
+    if (!await usesRemote) {
+      final t = shareDisplayTitle.trim();
+      final nextVoices = room.sharedVoices.map((v) {
+        if (v.id != shareRecordId) return v;
+        return v.copyWith(
+          voiceTitle: t.isEmpty ? v.voiceTitle : t,
+          accessScope: accessScope,
+          subtitle: switch (accessScope) {
+            RoomVoiceAccessScope.listenOnly => '듣기 전용',
+            RoomVoiceAccessScope.downloadAllowed => '다운로드 허용',
+          },
+        );
+      }).toList(growable: false);
+      return room.copyWith(sharedVoices: nextVoices);
+    }
+
+    final t = shareDisplayTitle.trim();
+    if (t.isEmpty) throw ArgumentError('방에 보일 이름을 입력해 주세요.');
+
+    await _api.putJsonObject(
+      '/room/${room.id}/voice-shares/$shareRecordId',
+      body: <String, dynamic>{
+        'accessScope': _accessScopeToWire(accessScope),
+        'shareDisplayTitle': t,
+      },
+    );
     return loadRoomDetail(room);
+  }
+
+  /// [mustIncludeVoiceKeys] 가 비면 한 번만 [loadRoomDetail] 합니다.
+  Future<Room> _reloadRoomDetailWhenSharesInclude(
+    Room room, {
+    List<String> mustIncludeVoiceKeys = const [],
+  }) async {
+    if (mustIncludeVoiceKeys.isEmpty) {
+      return loadRoomDetail(room);
+    }
+
+    final required = mustIncludeVoiceKeys.toSet();
+    const maxAttempts = 10;
+    const delayBetween = Duration(milliseconds: 280);
+
+    Room? lastDetail;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      lastDetail = await loadRoomDetail(room);
+      final present = lastDetail.sharedVoices
+          .map((v) => v.externalVoiceId)
+          .toSet();
+      if (required.every(present.contains)) {
+        return lastDetail;
+      }
+      if (attempt < maxAttempts - 1) {
+        await Future<void>.delayed(delayBetween);
+      }
+    }
+    return lastDetail!;
+  }
+
+  /// 방 공유 음성 클론 합성. 백엔드: `POST /room/{roomId}/voice-shares/{shareId}/text-to-speech`
+  Future<VoiceSynthesisResult> synthesizeRoomSharedSpeech({
+    required String roomId,
+    required String shareId,
+    required String text,
+  }) async {
+    if (!await usesRemote) {
+      throw UnsupportedError('로그인 후에만 방 공유 음성 합성을 할 수 있어요.');
+    }
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('읽을 문장을 입력해 주세요.');
+    }
+    final response = await _api.postJsonObject(
+      '/room/$roomId/voice-shares/$shareId/text-to-speech',
+      body: <String, dynamic>{'text': trimmed},
+    );
+    return VoiceSynthesisResult(
+      speechRequestId: (response['speechRequestId'] as num?)?.toInt() ?? 0,
+      generatedAudioId: (response['generatedAudioId'] as num?)?.toInt() ?? 0,
+      streamUrl: response['streamUrl'] as String? ?? '',
+      downloadUrl: response['downloadUrl'] as String? ?? '',
+    );
+  }
+
+  /// [VoiceLibraryRepository.fetchGeneratedAudioStream] 과 동일한 스트림 URL.
+  Future<Uint8List> fetchGeneratedAudioStream(int generatedAudioId) {
+    return _voiceLibraryRepository.fetchGeneratedAudioStream(generatedAudioId);
+  }
+
+  /// 다운로드 허용 권한용 — 합성 결과 파일 형태 (`GET …/download`).
+  Future<Uint8List> fetchGeneratedAudioDownload(int generatedAudioId) {
+    return _voiceLibraryRepository.fetchGeneratedAudioDownload(generatedAudioId);
   }
 
   List<Room> _mockRooms() {
@@ -270,6 +402,18 @@ class RoomRepository {
   }
 }
 
+String _resolveShareDisplayTitle({
+  required String voiceId,
+  Map<String, String>? customTitles,
+  required Map<String, String> fileNameById,
+}) {
+  final raw = customTitles?[voiceId]?.trim();
+  if (raw != null && raw.isNotEmpty) return raw;
+  final name = fileNameById[voiceId]?.trim();
+  if (name != null && name.isNotEmpty) return name;
+  return voiceId;
+}
+
 Room _roomFromJson(Map<String, dynamic> json) {
   final name = json['name'] as String?;
   final title = json['title'] as String?;
@@ -289,22 +433,47 @@ Room _roomFromJson(Map<String, dynamic> json) {
   );
 }
 
+String _canonicalShareVoiceExternalId(Map<String, dynamic> json) {
+  String pick(Object? raw) {
+    if (raw == null) return '';
+    final s = raw.toString().trim();
+    if (s.isEmpty || s.toLowerCase() == 'null') return '';
+    return s;
+  }
+
+  final fromKey = pick(json['voiceKey']);
+  if (fromKey.isNotEmpty) return fromKey;
+  final fromExternal = pick(json['externalVoiceId']);
+  if (fromExternal.isNotEmpty) return fromExternal;
+  return '';
+}
+
 RoomSharedVoice _sharedVoiceFromJson(Map<String, dynamic> json) {
   final accessScope = _accessScopeFromWire(json['accessScope'] as String?);
+  final canonicalId = _canonicalShareVoiceExternalId(json);
+  final shareRowId = '${json['id']}';
+  final rawRoomId = json['roomId'];
+  final roomIdStr =
+      rawRoomId == null ? null : rawRoomId.toString().trim().isEmpty
+          ? null
+          : rawRoomId.toString().trim();
+  final rawVk = json['voiceKey'];
+  final vkTrimmed = rawVk?.toString().trim() ?? '';
+  final voiceKeyStr = vkTrimmed.isEmpty ? null : vkTrimmed;
+
   return RoomSharedVoice(
-    id: '${json['id']}',
+    id: shareRowId,
     externalVoiceId:
-        json['externalVoiceId'] as String? ??
-        json['voiceKey'] as String? ??
-        '${json['id']}',
+        canonicalId.isNotEmpty ? canonicalId : shareRowId,
     voiceTitle: json['voiceTitle'] as String? ?? '공유 음성',
     ownerName: json['ownerName'] as String? ?? '공유 음성',
     accessScope: accessScope,
     sharedAt:
         DateTime.tryParse(json['sharedAt'] as String? ?? '') ?? DateTime.now(),
+    roomId: roomIdStr,
+    voiceKey: voiceKeyStr,
     subtitle: switch (accessScope) {
       RoomVoiceAccessScope.listenOnly => '듣기 전용',
-      RoomVoiceAccessScope.synthesisAllowed => '합성 허용',
       RoomVoiceAccessScope.downloadAllowed => '다운로드 허용',
     },
   );
@@ -331,7 +500,8 @@ RoomJoinPolicy _joinPolicyFromWire(String? wire) {
 RoomVoiceAccessScope _accessScopeFromWire(String? wire) {
   return switch ((wire ?? '').toUpperCase()) {
     'LISTEN_ONLY' => RoomVoiceAccessScope.listenOnly,
-    'SYNTHESIS_ALLOWED' => RoomVoiceAccessScope.synthesisAllowed,
+    /// 서버/구버전 데이터 호환: 합성 권한은 앱에서 지원하지 않아 듣기 전용으로 취급
+    'SYNTHESIS_ALLOWED' => RoomVoiceAccessScope.listenOnly,
     'DOWNLOAD_ALLOWED' => RoomVoiceAccessScope.downloadAllowed,
     _ => RoomVoiceAccessScope.listenOnly,
   };
@@ -340,7 +510,6 @@ RoomVoiceAccessScope _accessScopeFromWire(String? wire) {
 String _accessScopeToWire(RoomVoiceAccessScope scope) {
   return switch (scope) {
     RoomVoiceAccessScope.listenOnly => 'LISTEN_ONLY',
-    RoomVoiceAccessScope.synthesisAllowed => 'SYNTHESIS_ALLOWED',
     RoomVoiceAccessScope.downloadAllowed => 'DOWNLOAD_ALLOWED',
   };
 }

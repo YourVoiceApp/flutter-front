@@ -11,7 +11,9 @@ import '../../../../app/services/app_services.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../data/auth_api_client.dart';
 import '../../data/google_auth_flow_exception.dart';
+import '../../domain/auth_user.dart';
 import 'sign_up_page.dart';
+import 'social_nickname_setup_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -76,6 +78,24 @@ class _LoginPageState extends State<LoginPage> {
       await _showAuthErrorDialog(title: '예상하지 못한 로그인 오류', body: '$e');
     } finally {
       if (mounted) setState(() => _loggingIn = false);
+    }
+  }
+
+  void _openMainOrNicknameSetup(AuthUser user) {
+    if (!mounted) return;
+    if (user.needsSocialNicknameSetup) {
+      Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute<void>(
+          builder: (_) => SocialNicknameSetupPage(
+            email: user.email,
+            suggestedNickname: user.nickName,
+          ),
+        ),
+      );
+    } else {
+      Navigator.of(context).pushReplacement<void, void>(
+        MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
+      );
     }
   }
 
@@ -158,9 +178,9 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await _services.googleBackendAuth.signInExchangeAndPersist();
       if (!mounted) return;
-      Navigator.of(context).pushReplacement<void, void>(
-        MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
-      );
+      final user = await _services.authService.fetchCurrentUser();
+      if (!mounted) return;
+      _openMainOrNicknameSetup(user);
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) {
         await _showAuthErrorDialog(
@@ -230,9 +250,9 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await _services.kakaoBackendAuth.signInExchangeAndPersist();
       if (!mounted) return;
-      Navigator.of(context).pushReplacement<void, void>(
-        MaterialPageRoute<void>(builder: (_) => const MainShellPage()),
-      );
+      final user = await _services.authService.fetchCurrentUser();
+      if (!mounted) return;
+      _openMainOrNicknameSetup(user);
     } on AuthApiException catch (e) {
       await _showAuthErrorDialog(
         title: e.isNetworkError

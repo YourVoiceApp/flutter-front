@@ -54,7 +54,8 @@ class KakaoBackendAuth {
     try {
       await _authService.completeKakaoSignIn(
         accessToken: kakaoAccessToken,
-        fallbackNickName: 'kakao',
+        /// `/me` 실패 시 빈 닉으로 두어 닉네임 설정 화면으로 유도
+        fallbackNickName: '',
       );
     } finally {
       // We do not use Kakao tokens for app auth; keep only our backend JWT.

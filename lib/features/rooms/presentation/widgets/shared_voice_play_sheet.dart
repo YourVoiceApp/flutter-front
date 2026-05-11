@@ -7,14 +7,18 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../../shared/presentation/widgets/common_widgets.dart';
+import '../../../voices/data/voice_library_repository.dart';
+import '../../../voices/domain/voice_job.dart';
 import '../../data/room_repository.dart';
 import '../../domain/room.dart';
 
-/// 공유 음성 「사용」→ [accessScope] 에 따라 서버 클론 합성 또는 기기 TTS
+/// 공유 음성 「사용」→ 보유 음성과 동일하게 `POST /voices/{ownershipId}/text-to-speech` 우선,
+/// 불가 시 `POST /room/.../voice-shares/.../text-to-speech`. 미로그인은 기기 TTS.
 Future<void> showSharedVoicePlaySheet(
   BuildContext context, {
   required String roomId,
   required RoomSharedVoice voice,
+  List<VoiceJob> libraryJobs = const [],
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -23,8 +27,11 @@ Future<void> showSharedVoicePlaySheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) =>
-        _SharedVoicePlaySheet(roomId: roomId, voice: voice),
+    builder: (ctx) => _SharedVoicePlaySheet(
+      roomId: roomId,
+      voice: voice,
+      libraryJobs: libraryJobs,
+    ),
   );
 }
 
@@ -32,10 +39,12 @@ class _SharedVoicePlaySheet extends StatefulWidget {
   const _SharedVoicePlaySheet({
     required this.roomId,
     required this.voice,
+    this.libraryJobs = const [],
   });
 
   final String roomId;
   final RoomSharedVoice voice;
+  final List<VoiceJob> libraryJobs;
 
   @override
   State<_SharedVoicePlaySheet> createState() => _SharedVoicePlaySheetState();
@@ -59,15 +68,24 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
 
   String _speechLocaleId = 'ko_KR';
 
+  /// `null`: 아직 확인 전 · `true`: 세션 있음(서버 합성 가능)
+  bool? _hasRemoteSession;
+
   @override
   void initState() {
     super.initState();
     _textCtrl = TextEditingController();
+    _refreshRemoteSession();
     _initTts();
     _initSpeech();
     _audioPlayer.onPlayerComplete.listen((_) {
       if (mounted) setState(() => _speaking = false);
     });
+  }
+
+  Future<void> _refreshRemoteSession() async {
+    final v = await _roomRepository.usesRemote;
+    if (mounted) setState(() => _hasRemoteSession = v);
   }
 
   Future<void> _initTts() async {
@@ -187,20 +205,53 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
       }
     }
 
+    int? resolvedOwnershipId() {
+      final fromShare = widget.voice.ownershipId;
+      if (fromShare != null && fromShare > 0) return fromShare;
+
+      final ext = widget.voice.externalVoiceId.trim();
+      final vk = (widget.voice.voiceKey ?? '').trim();
+      for (final job in widget.libraryJobs) {
+        final oid = job.ownershipId;
+        if (oid == null || oid <= 0) continue;
+        if (job.id == ext || (vk.isNotEmpty && job.id == vk)) {
+          return oid;
+        }
+      }
+      final parsed = int.tryParse(ext) ??
+          (vk.isNotEmpty ? int.tryParse(vk) : null);
+      if (parsed != null && parsed > 0) return parsed;
+      return null;
+    }
+
+    Future<VoiceSynthesisResult> requestSynthesis() async {
+      final oid = resolvedOwnershipId();
+      if (oid != null) {
+        try {
+          return await _roomRepository.synthesizeOwnedVoiceSpeech(
+            ownershipId: oid,
+            text: t,
+          );
+        } catch (_) {
+          return await _roomRepository.synthesizeRoomSharedSpeech(
+            roomId: widget.roomId,
+            shareId: widget.voice.id,
+            text: t,
+          );
+        }
+      }
+      return await _roomRepository.synthesizeRoomSharedSpeech(
+        roomId: widget.roomId,
+        shareId: widget.voice.id,
+        text: t,
+      );
+    }
+
     Future<void> playServerSynth() async {
       if (mounted) setState(() => _synthesizing = true);
       try {
-        final result = await _roomRepository.synthesizeRoomSharedSpeech(
-          roomId: widget.roomId,
-          shareId: widget.voice.id,
-          text: t,
-        );
-        if (result.generatedAudioId <= 0) {
-          throw StateError('합성 결과 id가 없어요.');
-        }
-        final bytes = await _roomRepository.fetchGeneratedAudioStream(
-          result.generatedAudioId,
-        );
+        final result = await requestSynthesis();
+        final bytes = await _roomRepository.fetchSynthesizedAudioBytes(result);
         if (!mounted) return;
         if (mounted) {
           setState(() {
@@ -224,11 +275,13 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
       }
     }
 
-    switch (widget.voice.accessScope) {
-      case RoomVoiceAccessScope.listenOnly:
-        await playDeviceTts();
-      case RoomVoiceAccessScope.downloadAllowed:
-        await playServerSynth();
+    final remote = await _roomRepository.usesRemote;
+    if (!mounted) return;
+    setState(() => _hasRemoteSession = remote);
+    if (remote) {
+      await playServerSynth();
+    } else {
+      await playDeviceTts();
     }
   }
 
@@ -248,16 +301,24 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
   }
 
   String _playbackScopeHint() {
-    switch (widget.voice.accessScope) {
-      case RoomVoiceAccessScope.listenOnly:
-        return '듣기 전용: 서버 클론 합성 없이 아래 문장을 기기 목소리(TTS)로 들을 수 있어요.';
-      case RoomVoiceAccessScope.downloadAllowed:
-        return '내려받기 허용: 서버 클론 합성으로 재생합니다. 음성 파일 저장은 추후 연동 예정이에요.';
-    }
+    final remote = _hasRemoteSession;
+    final synthLine = remote == null
+        ? '로그인 상태를 확인하는 중이에요.'
+        : remote
+        ? '공유된 클론 음성으로 문장을 합성해 들려요. (방 공유 TTS API)'
+        : '로그인하면 공유 음색으로 합성해 들을 수 있어요. 지금은 기기 목소리(TTS)로 재생돼요.';
+    final scopeLine = switch (widget.voice.accessScope) {
+      RoomVoiceAccessScope.listenOnly =>
+        '다른 사람은 이 음성 파일을 내려받을 수 없어요(듣기만).',
+      RoomVoiceAccessScope.downloadAllowed =>
+        '다운로드 허용: 합성 결과 파일 저장 등은 추후 연동 예정이에요.',
+    };
+    return '$synthLine $scopeLine';
   }
 
-  bool get _listenOnlyUsesDeviceTts =>
-      widget.voice.accessScope == RoomVoiceAccessScope.listenOnly;
+  /// 원격 합성이 아닐 때만 기기 TTS 준비가 필요함
+  bool get _blockListenUntilTts =>
+      _hasRemoteSession != true && !_ttsReady;
 
   @override
   Widget build(BuildContext context) {
@@ -395,7 +456,7 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                   Expanded(
                     child: FilledButton.icon(
                       onPressed:
-                          ((_listenOnlyUsesDeviceTts && !_ttsReady) ||
+                          (_blockListenUntilTts ||
                                   _speaking ||
                                   _synthesizing)
                               ? null
@@ -443,8 +504,7 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
               const SizedBox(height: 10),
               TextButton.icon(
                 onPressed:
-                    ((_listenOnlyUsesDeviceTts ? _ttsReady : true) &&
-                            !_synthesizing)
+                    (!_blockListenUntilTts && !_synthesizing)
                         ? () async {
                             await _stop();
                             await _speak();

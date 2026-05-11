@@ -18,6 +18,7 @@ class VoicePipelinePage extends StatefulWidget {
     required this.onUploadTap,
     required this.onDirectRecordTap,
     required this.onOpenFolderManage,
+    required this.onCreateFolder,
     required this.onRefreshScope,
     required this.onAdvanceDemo,
     required this.onDeleteJob,
@@ -36,6 +37,11 @@ class VoicePipelinePage extends StatefulWidget {
   final Future<void> Function([String? initialFolderId]) onDirectRecordTap;
 
   final Future<void> Function([String? currentFolderId]) onOpenFolderManage;
+
+  /// `POST /voice-folders` — 새 폴더 id 반환. [parentFolderId] 는 루트면 null.
+  final Future<String> Function(String name, String? parentFolderId)
+  onCreateFolder;
+
   final Future<void> Function([String? folderId]) onRefreshScope;
   final void Function(String id) onAdvanceDemo;
   final void Function(String id) onDeleteJob;
@@ -62,6 +68,8 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
 
   /// null: 루트(내 폴더 목록) · 그 외: 열린 폴더 id
   String? _scope;
+
+  bool _creatingFolder = false;
 
   @override
   void initState() {
@@ -775,24 +783,140 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
     );
   }
 
-  Widget _buildNewFolderToolbarButton({String? currentFolderId}) {
-    return FilledButton.tonalIcon(
-      onPressed: () => widget.onOpenFolderManage(currentFolderId),
-      icon: const Icon(Icons.create_new_folder_rounded, size: 20),
-      label: const Text(
-        '새 폴더',
-        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-      ),
-      style: FilledButton.styleFrom(
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        backgroundColor: YeolpumtaTheme.surface,
-        foregroundColor: YeolpumtaTheme.textPrimary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: YeolpumtaTheme.outline),
+  String? _parentFolderIdForCreate(String? currentFolderId) {
+    if (currentFolderId == null ||
+        currentFolderId == VoiceFolder.uncategorizedId) {
+      return null;
+    }
+    return currentFolderId;
+  }
+
+  Future<void> _quickCreateFolder({String? currentFolderId}) async {
+    if (_creatingFolder) return;
+    final parentId = _parentFolderIdForCreate(currentFolderId);
+    final ctrl = TextEditingController();
+    final parentHint = parentId == null
+        ? '최상위 폴더에 만들어요.'
+        : '「${_folderPath(parentId)}」 안에 하위 폴더로 만들어요.';
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: YeolpumtaTheme.surface,
+          title: const Text('폴더 만들기'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                parentHint,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.95),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: '폴더 이름',
+                  border: OutlineInputBorder(),
+                ),
+                onSubmitted: (_) =>
+                    Navigator.of(ctx).pop(ctrl.text.trim().isNotEmpty),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (ctrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('만들기'),
+            ),
+          ],
         ),
-      ),
+      );
+      if (ok != true || !mounted) return;
+      final name = ctrl.text.trim();
+      if (name.isEmpty) return;
+      setState(() => _creatingFolder = true);
+      try {
+        await widget.onCreateFolder(name, parentId);
+        if (!mounted) return;
+        await widget.onRefreshScope(_scope);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('「$name」 폴더를 만들었어요.')),
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$e')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _creatingFolder = false);
+      }
+    } finally {
+      ctrl.dispose();
+    }
+  }
+
+  Widget _buildFolderToolbar({String? currentFolderId}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FilledButton.tonalIcon(
+          onPressed: _creatingFolder
+              ? null
+              : () => _quickCreateFolder(currentFolderId: currentFolderId),
+          icon: const Icon(Icons.add_rounded, size: 20),
+          label: const Text(
+            '만들기',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          style: FilledButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            backgroundColor: YeolpumtaTheme.accentSoft,
+            foregroundColor: YeolpumtaTheme.accent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: YeolpumtaTheme.accent.withValues(alpha: 0.35),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        FilledButton.tonalIcon(
+          onPressed: _creatingFolder
+              ? null
+              : () => widget.onOpenFolderManage(currentFolderId),
+          icon: const Icon(Icons.folder_open_rounded, size: 20),
+          label: const Text(
+            '관리',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          style: FilledButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            backgroundColor: YeolpumtaTheme.surface,
+            foregroundColor: YeolpumtaTheme.textPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: YeolpumtaTheme.outline),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -819,7 +943,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                 ],
               ),
             ),
-            _buildNewFolderToolbarButton(),
+            _buildFolderToolbar(),
           ],
         ),
       ],
@@ -863,7 +987,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                 ],
               ),
             ),
-            _buildNewFolderToolbarButton(currentFolderId: _scope),
+            _buildFolderToolbar(currentFolderId: _scope),
           ],
         ),
       ],
@@ -896,7 +1020,7 @@ class _EmptyRootFoldersHint extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '오른쪽 위 「새 폴더」로 첫 폴더를 만들거나,\n음성 녹음으로 바로 추가해 보세요.',
+          '오른쪽 위 「만들기」로 첫 폴더를 만들거나,\n음성 녹음으로 바로 추가해 보세요.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -926,7 +1050,7 @@ class _RootHint extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '아래 목록에서 폴더를 누르거나,\n오른쪽 위 「새 폴더」를 눌러 보세요',
+            '아래 목록에서 폴더를 누르거나,\n오른쪽 위 「만들기」·「관리」를 눌러 보세요',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,

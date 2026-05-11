@@ -9,14 +9,15 @@ import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../domain/voice_folder.dart';
 import '../../domain/voice_upload_request.dart';
 import 'read_recording_output.dart';
+import 'wav_duration_trim.dart';
 
 /// 서버: 짧으면 거절(‘few seconds’), 파일 최대 약 [maxWaveBytesApprox] 근처 WAV.
 /// WAV 44100 Hz 모노 16bit ≈ 88.2KB/s → 대략 32초까지가 3MB에 여유 있음.
 abstract final class VoiceRecordLimits {
-  static const int minSeconds = 10;
-  static const int maxSeconds = 32;
-  /// 최대 허용 직전 [autoStopAdvanceSeconds]초에 녹음을 자동 종료함.
-  static const int autoStopAdvanceSeconds = 3;
+  static const int minSeconds = 5;
+  static const int maxSeconds = 10;
+  /// 최대 허용 시간에 맞춰 녹음을 자동 종료함.
+  static const int autoStopAdvanceSeconds = 0;
 }
 
 /// 마이크 녹음 + 폴더 선택 → [VoiceUploadRequest]
@@ -256,7 +257,7 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '최대 길이 ${VoiceRecordLimits.autoStopAdvanceSeconds}초 전에 맞춰 녹음을 멈춰 저장했어요. '
+              '최대 길이 ${VoiceRecordLimits.maxSeconds}초에 맞춰 녹음을 멈춰 저장했어요. '
               '(${VoiceRecordLimits.minSeconds}초~${VoiceRecordLimits.maxSeconds}초 안내 참고)',
             ),
           ),
@@ -317,10 +318,20 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
   }
 
   void _confirm() {
-    final bytes = _recordedBytes;
+    var bytes = _recordedBytes;
     final filename = _recordedName;
-    final dur = _recordedDurationSec;
+    var dur = _recordedDurationSec;
     if (bytes == null || filename == null || dur == null) return;
+
+    final trimmed = WavDurationTrim.trimToMaxKeepingTail(
+      wavBytes: bytes,
+      minSeconds: VoiceRecordLimits.minSeconds,
+      maxSeconds: VoiceRecordLimits.maxSeconds,
+    );
+    if (trimmed != null) {
+      bytes = trimmed.bytes;
+      dur = trimmed.durationSeconds;
+    }
 
     if (dur < VoiceRecordLimits.minSeconds) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -500,7 +511,7 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
                   const SizedBox(height: 6),
                   Text(
                     '· 최소 ${VoiceRecordLimits.minSeconds}초 이상 말해 주세요 (짧으면 등록이 안 돼요)\n'
-                    '· 최대 약 ${VoiceRecordLimits.maxSeconds}초 · 서버 업로드 한도 3MB',
+                    '· 최대 ${VoiceRecordLimits.maxSeconds}초까지 업로드돼요 (넘으면 앞부분을 잘라 최근 구간만 사용)',
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.45,
@@ -509,7 +520,7 @@ class _VoiceRecordSheetState extends State<VoiceRecordSheet> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${VoiceRecordLimits.autoStopAdvanceSeconds}초 전에 자동으로 녹음이 멈춰요.',
+                    '${VoiceRecordLimits.maxSeconds}초에 자동으로 녹음이 멈춰요.',
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,

@@ -194,6 +194,7 @@ class RoomRepository {
               ownerName: '나',
               subtitle: voice.origin.label,
               accessScope: accessScopeForSelection,
+              ownershipId: voice.ownershipId,
             ),
           )
           .toList(growable: false);
@@ -353,6 +354,7 @@ class RoomRepository {
     final response = await _api.postJsonObject(
       '/room/$roomId/voice-shares/$shareId/text-to-speech',
       body: <String, dynamic>{'text': trimmed},
+      successCodes: const {200, 201},
     );
     return VoiceSynthesisResult(
       speechRequestId: (response['speechRequestId'] as num?)?.toInt() ?? 0,
@@ -365,6 +367,22 @@ class RoomRepository {
   /// [VoiceLibraryRepository.fetchGeneratedAudioStream] 과 동일한 스트림 URL.
   Future<Uint8List> fetchGeneratedAudioStream(int generatedAudioId) {
     return _voiceLibraryRepository.fetchGeneratedAudioStream(generatedAudioId);
+  }
+
+  /// 합성 API JSON 응답 기준으로 스트림 바이트 로드 (`generatedAudioId` 또는 `streamUrl`).
+  Future<Uint8List> fetchSynthesizedAudioBytes(VoiceSynthesisResult result) {
+    return _voiceLibraryRepository.fetchSynthesisPlayback(result);
+  }
+
+  /// 보유 음성과 동일 — `POST /voices/{ownershipId}/text-to-speech`
+  Future<VoiceSynthesisResult> synthesizeOwnedVoiceSpeech({
+    required int ownershipId,
+    required String text,
+  }) {
+    return _voiceLibraryRepository.synthesizeSpeechWithOwnershipId(
+      ownershipId: ownershipId,
+      text: text,
+    );
   }
 
   /// 다운로드 허용 권한용 — 합성 결과 파일 형태 (`GET …/download`).
@@ -412,6 +430,13 @@ String _resolveShareDisplayTitle({
   final name = fileNameById[voiceId]?.trim();
   if (name != null && name.isNotEmpty) return name;
   return voiceId;
+}
+
+int? _parseWireInt(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v.trim());
+  return null;
 }
 
 Room _roomFromJson(Map<String, dynamic> json) {
@@ -467,6 +492,8 @@ RoomSharedVoice _sharedVoiceFromJson(Map<String, dynamic> json) {
         canonicalId.isNotEmpty ? canonicalId : shareRowId,
     voiceTitle: json['voiceTitle'] as String? ?? '공유 음성',
     ownerName: json['ownerName'] as String? ?? '공유 음성',
+    ownershipId: _parseWireInt(json['ownershipId']) ??
+        _parseWireInt(json['voiceOwnershipId']),
     accessScope: accessScope,
     sharedAt:
         DateTime.tryParse(json['sharedAt'] as String? ?? '') ?? DateTime.now(),

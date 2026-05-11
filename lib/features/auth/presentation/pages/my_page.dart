@@ -17,6 +17,7 @@ class MyPage extends StatefulWidget {
     required this.repository,
     required this.profileRepository,
     required this.folders,
+    this.onCreateFolder,
     required this.onAdvanceDemo,
     required this.onDeleteJob,
     required this.onRenameJob,
@@ -30,6 +31,11 @@ class MyPage extends StatefulWidget {
   final VoiceLibraryRepository repository;
   final UserProfileRepository profileRepository;
   final List<VoiceFolder> folders;
+
+  /// `POST /voice-folders` — 음성 탭과 동일 API. 없으면 AppBar 에 만들기 버튼을 숨깁니다.
+  final Future<String> Function(String name, String? parentFolderId)?
+  onCreateFolder;
+
   final Future<void> Function(String id) onAdvanceDemo;
   final Future<void> Function(String id) onDeleteJob;
   final Future<void> Function(String jobId, String newName) onRenameJob;
@@ -47,14 +53,25 @@ class MyPage extends StatefulWidget {
 
 class _MyPageState extends State<MyPage> {
   List<VoiceJob> _jobs = [];
+  List<VoiceFolder> _folders = [];
   UserProfile? _profile;
   bool _loading = true;
   VoiceOrigin? _originFilter;
+  bool _creatingFolder = false;
 
   @override
   void initState() {
     super.initState();
+    _folders = List<VoiceFolder>.from(widget.folders);
     _reload();
+  }
+
+  @override
+  void didUpdateWidget(covariant MyPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.folders != widget.folders) {
+      _folders = List<VoiceFolder>.from(widget.folders);
+    }
   }
 
   Future<void> _reload() async {
@@ -64,9 +81,71 @@ class _MyPageState extends State<MyPage> {
     if (!mounted) return;
     setState(() {
       _jobs = snap.jobs;
+      _folders = snap.folders;
       _profile = prof;
       _loading = false;
     });
+  }
+
+  Future<void> _quickCreateFolder() async {
+    final create = widget.onCreateFolder;
+    if (create == null || _creatingFolder) return;
+    final ctrl = TextEditingController();
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: YeolpumtaTheme.surface,
+          title: const Text('음성 폴더 만들기'),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: '폴더 이름',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) =>
+                Navigator.of(ctx).pop(ctrl.text.trim().isNotEmpty),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (ctrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('만들기'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+      final name = ctrl.text.trim();
+      if (name.isEmpty) return;
+      setState(() => _creatingFolder = true);
+      try {
+        await create(name, null);
+        if (!mounted) return;
+        await _reload();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('「$name」 폴더를 만들었어요.')),
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$e')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _creatingFolder = false);
+      }
+    } finally {
+      ctrl.dispose();
+    }
   }
 
   Future<void> _openAccountDetail() async {
@@ -99,14 +178,14 @@ class _MyPageState extends State<MyPage> {
 
   String _folderName(String folderId) {
     try {
-      return widget.folders.firstWhere((f) => f.id == folderId).name;
+      return _folders.firstWhere((f) => f.id == folderId).name;
     } catch (_) {
       return '폴더';
     }
   }
 
   List<VoiceFolder> get _sortedFolders {
-    final list = List<VoiceFolder>.from(widget.folders);
+    final list = List<VoiceFolder>.from(_folders);
     list.sort((a, b) {
       if (a.id == VoiceFolder.uncategorizedId) return -1;
       if (b.id == VoiceFolder.uncategorizedId) return 1;
@@ -184,7 +263,23 @@ class _MyPageState extends State<MyPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: YeolpumtaTheme.bg,
-      appBar: AppBar(title: const Text('마이페이지')),
+      appBar: AppBar(
+        title: const Text('마이페이지'),
+        actions: [
+          if (widget.onCreateFolder != null)
+            IconButton(
+              tooltip: '음성 폴더 만들기',
+              onPressed: _creatingFolder ? null : _quickCreateFolder,
+              icon: _creatingFolder
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.create_new_folder_outlined),
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

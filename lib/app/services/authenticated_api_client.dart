@@ -93,8 +93,14 @@ class AuthenticatedApiClient {
   Future<Map<String, dynamic>> postJsonObject(
     String path, {
     Map<String, dynamic>? body,
+    Set<int> successCodes = const {200},
   }) {
-    return _sendJsonObject('POST', _uri(path), body: body);
+    return _sendJsonObject(
+      'POST',
+      _uri(path),
+      body: body,
+      successCodes: successCodes,
+    );
   }
 
   /// POST that expects a JSON **array** in the response body.
@@ -138,6 +144,15 @@ class AuthenticatedApiClient {
     Duration timeout = const Duration(seconds: 120),
   }) async {
     final uri = _uri(path, queryParameters: queryParameters);
+    return getBytesUri(uri, accept: accept, timeout: timeout);
+  }
+
+  /// 절대 URL(예: 합성 응답의 [streamUrl]) — 베이스 URL을 붙이지 않습니다.
+  Future<Uint8List> getBytesUri(
+    Uri uri, {
+    String accept = 'audio/mpeg,*/*',
+    Duration timeout = const Duration(seconds: 120),
+  }) async {
     return _authService.authorizedRequest((accessToken) async {
       final headers = <String, String>{
         'Accept': accept,

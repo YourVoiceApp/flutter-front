@@ -29,6 +29,7 @@ class RoomSharedVoice {
     this.subtitle,
     this.roomId,
     this.voiceKey,
+    this.ownershipId,
   });
 
   /// 공유 레코드 id — `DELETE`/`PUT …/voice-shares/{shareId}` 경로용
@@ -37,6 +38,9 @@ class RoomSharedVoice {
   /// 클론 음성 식별(라이브러리와 동일 키)
   final String externalVoiceId;
   final String ownerName;
+
+  /// 있으면 음성 탭과 동일하게 `POST /voices/{ownershipId}/text-to-speech` 에 바로 사용
+  final int? ownershipId;
   final RoomVoiceAccessScope accessScope;
   final DateTime? sharedAt;
   final String? subtitle;
@@ -55,6 +59,7 @@ class RoomSharedVoice {
     String? subtitle,
     String? roomId,
     String? voiceKey,
+    int? ownershipId,
   }) {
     return RoomSharedVoice(
       id: id ?? this.id,
@@ -66,6 +71,7 @@ class RoomSharedVoice {
       subtitle: subtitle ?? this.subtitle,
       roomId: roomId ?? this.roomId,
       voiceKey: voiceKey ?? this.voiceKey,
+      ownershipId: ownershipId ?? this.ownershipId,
     );
   }
 }

@@ -651,9 +651,7 @@ class _ListenComposerState extends State<_ListenComposer> {
           job: widget.voice,
           text: t,
         );
-        final bytes = await _voiceRepository.fetchGeneratedAudioStream(
-          result.generatedAudioId,
-        );
+        final bytes = await _voiceRepository.fetchSynthesisPlayback(result);
         await _audioPlayer.play(BytesSource(bytes));
         if (mounted) setState(() => _synthesizing = false);
         return;

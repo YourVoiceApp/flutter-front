@@ -520,15 +520,14 @@ class VoiceLibraryRepository {
     return next;
   }
 
-  Future<VoiceSynthesisResult> synthesizeSpeech({
-    required VoiceJob job,
+  /// 음성 탭·방 공유 재생 공통 — `POST /voices/{ownershipId}/text-to-speech`
+  Future<VoiceSynthesisResult> synthesizeSpeechWithOwnershipId({
+    required int ownershipId,
     required String text,
   }) async {
-    final ownershipId = job.ownershipId;
-    if (ownershipId == null) {
-      throw StateError('이 음성은 TTS에 필요한 ownershipId가 없어요.');
+    if (ownershipId <= 0) {
+      throw ArgumentError('유효한 ownershipId가 아니에요.');
     }
-
     final trimmed = text.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError('읽을 문장을 입력해 주세요.');
@@ -537,6 +536,7 @@ class VoiceLibraryRepository {
     final response = await _api.postJsonObject(
       '/voices/$ownershipId/text-to-speech',
       body: <String, dynamic>{'text': trimmed},
+      successCodes: const {200, 201},
     );
 
     return VoiceSynthesisResult(
@@ -545,6 +545,44 @@ class VoiceLibraryRepository {
       streamUrl: response['streamUrl'] as String? ?? '',
       downloadUrl: response['downloadUrl'] as String? ?? '',
     );
+  }
+
+  Future<VoiceSynthesisResult> synthesizeSpeech({
+    required VoiceJob job,
+    required String text,
+  }) async {
+    final ownershipId = job.ownershipId;
+    if (ownershipId == null) {
+      throw StateError('이 음성은 TTS에 필요한 ownershipId가 없어요.');
+    }
+    return synthesizeSpeechWithOwnershipId(
+      ownershipId: ownershipId,
+      text: text,
+    );
+  }
+
+  /// [POST /voices/{ownershipId}/text-to-speech] 응답으로 재생 바이트를 가져옵니다.
+  /// `generatedAudioId`가 있으면 `GET .../generated-audios/{id}/stream`, 없으면 [streamUrl] 사용.
+  Future<Uint8List> fetchSynthesisPlayback(VoiceSynthesisResult result) async {
+    final id = result.generatedAudioId;
+    if (id > 0) {
+      return fetchGeneratedAudioStream(id);
+    }
+    var pathOrUrl = result.streamUrl.trim();
+    if (pathOrUrl.isEmpty ||
+        pathOrUrl.toLowerCase() == 'string' ||
+        pathOrUrl.toLowerCase() == 'null') {
+      throw StateError(
+        '합성 응답에 오디오를 찾을 수 없어요. (generatedAudioId·streamUrl 확인)',
+      );
+    }
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      return _api.getBytesUri(Uri.parse(pathOrUrl));
+    }
+    if (!pathOrUrl.startsWith('/')) {
+      pathOrUrl = '/$pathOrUrl';
+    }
+    return _api.getBytes(pathOrUrl);
   }
 
   /// 서버에서 합성한 오디오를 재생용으로 가져옵니다 (`GET .../stream`).
@@ -749,6 +787,13 @@ String _normalizeRemoteVoiceFolderId(Object? rawFolderId) {
   return normalized ?? VoiceFolder.uncategorizedId;
 }
 
+int? _intFromServerJson(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v.trim());
+  return null;
+}
+
 VoiceJob _remoteVoiceFromJson(Map<String, dynamic> json) {
   final acquiredBy = (json['acquiredBy'] as String? ?? '').toUpperCase();
   return VoiceJob(
@@ -759,7 +804,8 @@ VoiceJob _remoteVoiceFromJson(Map<String, dynamic> json) {
         DateTime.tryParse(json['acquiredAt'] as String? ?? '') ??
         DateTime.now(),
     folderId: _normalizeRemoteVoiceFolderId(json['folderId']),
-    ownershipId: (json['ownershipId'] as num?)?.toInt(),
+    ownershipId: _intFromServerJson(json['ownershipId']) ??
+        _intFromServerJson(json['id']),
     origin: switch (acquiredBy) {
       'CREATED' => VoiceOrigin.uploaded,
       'ROOM_SHARED' => VoiceOrigin.sharedRoom,

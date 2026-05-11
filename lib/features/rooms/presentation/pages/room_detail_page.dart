@@ -666,6 +666,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           context,
                           roomId: _room.id,
                           voice: v,
+                          libraryJobs: _myVoices,
                         ),
                         child: Text(
                           '사용',

@@ -1,9 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../domain/voice_folder.dart';
 import '../../domain/voice_upload_request.dart';
+import 'voice_record_sheet.dart';
+import 'wav_duration_trim.dart';
 
 /// 파일 선택 + 폴더 지정(새 폴더 추가 가능) → [VoiceUploadRequest] 반환
 class VoiceUploadSheet extends StatefulWidget {
@@ -29,6 +33,9 @@ class VoiceUploadSheet extends StatefulWidget {
 
 class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
   PlatformFile? _pickedFile;
+  Uint8List? _pickedBytesForUpload;
+  double? _pickedDurationSec;
+  bool _trimmedFromStart = false;
   late String _folderId;
   final _newFolderCtrl = TextEditingController();
   bool _busy = false;
@@ -90,7 +97,50 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
     if (r == null || r.files.isEmpty) return;
     final file = r.files.single;
     if (file.name.isEmpty || file.bytes == null) return;
-    setState(() => _pickedFile = file);
+    final lower = file.name.toLowerCase();
+    if (!lower.endsWith('.wav')) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('자동 길이 보정은 WAV만 지원해요. wav 파일로 올려 주세요.'),
+        ),
+      );
+      return;
+    }
+
+    final trimmed = WavDurationTrim.trimToMaxKeepingTail(
+      wavBytes: file.bytes!,
+      minSeconds: VoiceRecordLimits.minSeconds,
+      maxSeconds: VoiceRecordLimits.maxSeconds,
+    );
+    if (trimmed == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('WAV 파일 분석에 실패했어요. 다른 파일로 다시 시도해 주세요.'),
+        ),
+      );
+      return;
+    }
+    if (trimmed.durationSeconds < VoiceRecordLimits.minSeconds) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '업로드는 ${VoiceRecordLimits.minSeconds}~${VoiceRecordLimits.maxSeconds}초만 가능해요. '
+            '(현재 ${trimmed.durationSeconds.toStringAsFixed(1)}초)',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _pickedFile = file;
+      _pickedBytesForUpload = trimmed.bytes;
+      _pickedDurationSec = trimmed.durationSeconds;
+      _trimmedFromStart = trimmed.trimmedFromStart;
+    });
   }
 
   Future<void> _submitNewFolder() async {
@@ -122,10 +172,11 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
 
   void _confirm() {
     final pickedFile = _pickedFile;
-    if (pickedFile == null || pickedFile.bytes == null) return;
+    final uploadBytes = _pickedBytesForUpload;
+    if (pickedFile == null || uploadBytes == null) return;
     final request = VoiceUploadRequest(
       filename: pickedFile.name,
-      bytes: pickedFile.bytes!,
+      bytes: uploadBytes,
       folderId: _folderId,
       name: pickedFile.name.split('.').first,
     );
@@ -192,6 +243,27 @@ class _VoiceUploadSheetState extends State<VoiceUploadSheet> {
               ),
             ),
             const SizedBox(height: 16),
+            if (_pickedFile != null && _pickedDurationSec != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: YeolpumtaTheme.bg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: YeolpumtaTheme.divider),
+                ),
+                child: Text(
+                  _trimmedFromStart
+                      ? '길이 ${_pickedDurationSec!.toStringAsFixed(1)}초 · 앞부분을 잘라 최근 ${VoiceRecordLimits.maxSeconds}초로 맞췄어요.'
+                      : '길이 ${_pickedDurationSec!.toStringAsFixed(1)}초 · 업로드 가능 길이예요.',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: YeolpumtaTheme.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             const Text(
               '폴더',
               style: TextStyle(

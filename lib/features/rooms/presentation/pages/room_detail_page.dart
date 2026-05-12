@@ -58,7 +58,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     super.initState();
     _room = widget.initialRoom;
     _load();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapShareFabCoach());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _bootstrapShareFabCoach(),
+    );
   }
 
   Future<void> _bootstrapShareFabCoach() async {
@@ -85,8 +87,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         !stackBox.hasSize) {
       return;
     }
-    final topLeft =
-        stackBox.globalToLocal(fabBox.localToGlobal(Offset.zero));
+    final topLeft = stackBox.globalToLocal(fabBox.localToGlobal(Offset.zero));
     const pad = 8.0;
     if (!mounted) return;
     setState(() {
@@ -192,7 +193,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
-                          '비밀번호로 입장만 허용',
+                          '비밀번호방으로 설정',
                           style: TextStyle(
                             color: YeolpumtaTheme.textPrimary,
                             fontWeight: FontWeight.w600,
@@ -264,14 +265,14 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       }
                       final maxVal =
                           int.tryParse(maxCtrl.text.trim()) ??
-                          (_room.maxParticipants > 0 ? _room.maxParticipants : 3);
+                          (_room.maxParticipants > 0
+                              ? _room.maxParticipants
+                              : 3);
                       if (maxVal < 1) {
                         messenger
                           ..hideCurrentSnackBar()
                           ..showSnackBar(
-                            const SnackBar(
-                              content: Text('최대 인원은 1 이상이어야 해요.'),
-                            ),
+                            const SnackBar(content: Text('최대 인원은 1 이상이어야 해요.')),
                           );
                         return;
                       }
@@ -324,7 +325,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> _deleteRoom() async {
-    final ok = await showDialog<bool>(
+    final ok =
+        await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: YeolpumtaTheme.surface,
@@ -423,281 +425,232 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       fit: StackFit.expand,
       children: [
         Scaffold(
-      backgroundColor: YeolpumtaTheme.bg,
-      appBar: AppBar(
-        title: Text(_room.name),
-        actions: [
-          if (_isOwner && !_loading)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert_rounded),
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _editRoom();
-                } else if (value == 'delete') {
-                  _deleteRoom();
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'edit',
-                  child: Text(
-                    '방 정보 수정',
-                    style: TextStyle(color: YeolpumtaTheme.textPrimary),
-                  ),
-                ),
-                const PopupMenuDivider(),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Text(
-                    '방 삭제',
-                    style: TextStyle(
-                      color: Colors.red.shade700,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          IconButton(
-            tooltip: '초대 정보',
-            onPressed: () {
-              showDialog<void>(
-                context: context,
-                builder: (c) => AlertDialog(
-                  backgroundColor: YeolpumtaTheme.surface,
-                  surfaceTintColor: Colors.transparent,
-                  title: Text(
-                    '초대 코드',
-                    style: TextStyle(
-                      color: YeolpumtaTheme.textPrimary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SelectableText(
-                        _room.inviteCode,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                          color: YeolpumtaTheme.accent,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _room.requiresPassword
-                            ? '비밀번호가 켜진 방이에요. 코드와 함께 암호를 전달하세요.'
-                            : '코드만 알면 입장할 수 있어요.',
-                        style: TextStyle(
-                          color: YeolpumtaTheme.textSecondary,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(c),
+          backgroundColor: YeolpumtaTheme.bg,
+          appBar: AppBar(
+            title: Text(_room.name),
+            actions: [
+              if (_isOwner && !_loading)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert_rounded),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _editRoom();
+                    } else if (value == 'delete') {
+                      _deleteRoom();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'edit',
                       child: Text(
-                        '닫기',
+                        '방 정보 수정',
+                        style: TextStyle(color: YeolpumtaTheme.textPrimary),
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text(
+                        '방 삭제',
                         style: TextStyle(
-                          color: YeolpumtaTheme.accent,
+                          color: Colors.red.shade700,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ],
                 ),
-              );
-            },
-            icon: const Icon(Icons.ios_share_rounded),
+            ],
           ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async => _load(),
-        child: ListView(
-          physics: (_shareFabCoach && _shareFabHole != null)
-              ? const NeverScrollableScrollPhysics()
-              : const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-        children: [
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 16),
-              child: WhiteCard(
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
-          WhiteCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          body: RefreshIndicator(
+            onRefresh: () async => _load(),
+            child: ListView(
+              physics: (_shareFabCoach && _shareFabHole != null)
+                  ? const NeverScrollableScrollPhysics()
+                  : const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               children: [
-                Text(
-                  '멤버',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    color: YeolpumtaTheme.textPrimary,
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 16),
+                    child: WhiteCard(
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+                WhiteCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '멤버',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          color: YeolpumtaTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final m in _room.memberNames)
+                            Chip(
+                              avatar: Icon(
+                                Icons.person_rounded,
+                                size: 16,
+                                color: YeolpumtaTheme.accent,
+                              ),
+                              label: Text(m),
+                              backgroundColor: YeolpumtaTheme.accentSoft,
+                              side: BorderSide(
+                                color: YeolpumtaTheme.accent.withValues(
+                                  alpha: 0.2,
+                                ),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
+                            ),
+                          ActionChip(
+                            avatar: Icon(
+                              _room.requiresPassword
+                                  ? Icons.lock_outline_rounded
+                                  : Icons.public_rounded,
+                              size: 18,
+                              color: YeolpumtaTheme.accent,
+                            ),
+                            label: Text(
+                              _room.requiresPassword ? '비밀번호방' : '공개방',
+                              style: TextStyle(
+                                color: YeolpumtaTheme.accent,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            backgroundColor: YeolpumtaTheme.surface,
+                            side: const BorderSide(
+                              color: YeolpumtaTheme.outline,
+                            ),
+                            onPressed: () => showToast(
+                              context,
+                              _room.requiresPassword
+                                  ? '방 목록에서 이 방을 고른 뒤 비밀번호로 입장할 수 있어요.'
+                                  : '방 목록에서 이 방을 고르면 바로 입장할 수 있어요.',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                const SizedBox(height: 16),
+                Row(
                   children: [
-                    for (final m in _room.memberNames)
-                      Chip(
-                        avatar: Icon(
-                          Icons.person_rounded,
-                          size: 16,
-                          color: YeolpumtaTheme.accent,
-                        ),
-                        label: Text(m),
-                        backgroundColor: YeolpumtaTheme.accentSoft,
-                        side: BorderSide(
-                          color: YeolpumtaTheme.accent.withValues(alpha: 0.2),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 2,
-                        ),
-                      ),
-                    ActionChip(
-                      avatar: Icon(
-                        Icons.add_rounded,
-                        size: 18,
-                        color: YeolpumtaTheme.accent,
-                      ),
-                      label: Text(
-                        '초대',
-                        style: TextStyle(
-                          color: YeolpumtaTheme.accent,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      backgroundColor: YeolpumtaTheme.surface,
-                      side: const BorderSide(color: YeolpumtaTheme.outline),
-                      onPressed: () => showToast(
-                        context,
-                        '친구에게 초대 코드를 알려 주면, 방 탭에서 「방 입장」으로 들어올 수 있어요.',
+                    sectionTitle('공유된 음성'),
+                    const Spacer(),
+                    Text(
+                      '${_room.sharedVoices.length}개',
+                      style: TextStyle(
+                        color: YeolpumtaTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              sectionTitle('공유된 음성'),
-              const Spacer(),
-              Text(
-                '${_room.sharedVoices.length}개',
-                style: TextStyle(
-                  color: YeolpumtaTheme.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (_room.sharedVoices.isEmpty)
-            WhiteCard(
-              child: Text(
-                '아직 공유된 음성이 없어요. 아래에서 내 음성을 올려 보세요.',
-                style: TextStyle(
-                  color: YeolpumtaTheme.textSecondary,
-                  height: 1.4,
-                ),
-              ),
-            )
-          else
-            ..._room.sharedVoices.map(
-              (v) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: WhiteCard(
-                  child: Row(
-                    children: [
-                      VoiceCuteLeadingAvatar(
-                        origin: VoiceOrigin.sharedRoom,
-                        size: 44,
-                        borderRadius: 12,
+                const SizedBox(height: 10),
+                if (_room.sharedVoices.isEmpty)
+                  WhiteCard(
+                    child: Text(
+                      '아직 공유된 음성이 없어요. 아래에서 내 음성을 올려 보세요.',
+                      style: TextStyle(
+                        color: YeolpumtaTheme.textSecondary,
+                        height: 1.4,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                  )
+                else
+                  ..._room.sharedVoices.map(
+                    (v) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: WhiteCard(
+                        child: Row(
                           children: [
-                            Text(
-                              v.voiceTitle,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                                color: YeolpumtaTheme.textPrimary,
+                            VoiceCuteLeadingAvatar(
+                              origin: VoiceOrigin.sharedRoom,
+                              size: 44,
+                              borderRadius: 12,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    v.voiceTitle,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                      color: YeolpumtaTheme.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${v.ownerName} · ${v.subtitle ?? ''}',
+                                    style: TextStyle(
+                                      color: YeolpumtaTheme.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            Text(
-                              '${v.ownerName} · ${v.subtitle ?? ''}',
-                              style: TextStyle(
+                            IconButton(
+                              tooltip: '공유 이름·권한 수정',
+                              icon: Icon(
+                                Icons.edit_outlined,
                                 color: YeolpumtaTheme.textSecondary,
-                                fontSize: 12,
+                              ),
+                              onPressed: () => _editSharedVoice(v),
+                            ),
+                            TextButton(
+                              onPressed: () => showSharedVoicePlaySheet(
+                                context,
+                                roomId: _room.id,
+                                voice: v,
+                                libraryJobs: _myVoices,
+                              ),
+                              child: Text(
+                                '사용',
+                                style: TextStyle(
+                                  color: YeolpumtaTheme.accent,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      IconButton(
-                        tooltip: '공유 이름·권한 수정',
-                        icon: Icon(
-                          Icons.edit_outlined,
-                          color: YeolpumtaTheme.textSecondary,
-                        ),
-                        onPressed: () => _editSharedVoice(v),
-                      ),
-                      TextButton(
-                        onPressed: () => showSharedVoicePlaySheet(
-                          context,
-                          roomId: _room.id,
-                          voice: v,
-                          libraryJobs: _myVoices,
-                        ),
-                        child: Text(
-                          '사용',
-                          style: TextStyle(
-                            color: YeolpumtaTheme.accent,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+              ],
             ),
-        ],
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            key: _shareFabKey,
+            onPressed: _onShareFabPressed,
+            backgroundColor: YeolpumtaTheme.accent,
+            foregroundColor: Colors.white,
+            elevation: 2,
+            highlightElevation: 4,
+            icon: const Icon(Icons.upload_rounded),
+            label: const Text(
+              '내 음성 공유',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: _shareFabKey,
-        onPressed: _onShareFabPressed,
-        backgroundColor: YeolpumtaTheme.accent,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        highlightElevation: 4,
-        icon: const Icon(Icons.upload_rounded),
-        label: const Text(
-          '내 음성 공유',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
-    ),
         if (_shareFabCoach && _shareFabHole != null && !_loading)
           Positioned.fill(
             child: SpotlightCoachOverlay(
@@ -733,7 +686,8 @@ class _EditRoomSharedVoiceDialog extends StatefulWidget {
       _EditRoomSharedVoiceDialogState();
 }
 
-class _EditRoomSharedVoiceDialogState extends State<_EditRoomSharedVoiceDialog> {
+class _EditRoomSharedVoiceDialogState
+    extends State<_EditRoomSharedVoiceDialog> {
   late final TextEditingController _titleCtrl;
   late RoomVoiceAccessScope _scope;
 
@@ -837,16 +791,12 @@ class _EditRoomSharedVoiceDialogState extends State<_EditRoomSharedVoiceDialog> 
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(
-            '취소',
-            style: TextStyle(color: YeolpumtaTheme.accent),
-          ),
+          child: Text('취소', style: TextStyle(color: YeolpumtaTheme.accent)),
         ),
         FilledButton(
           onPressed: () {
             final raw = _titleCtrl.text.trim();
-            final titleSend =
-                raw.isEmpty ? widget.voice.voiceTitle : raw;
+            final titleSend = raw.isEmpty ? widget.voice.voiceTitle : raw;
             Navigator.pop(
               context,
               _EditSharedVoiceOutcome(

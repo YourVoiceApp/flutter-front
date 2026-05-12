@@ -5,6 +5,7 @@ import '../../../app/services/authenticated_api_client.dart';
 import '../../auth/data/auth_api_client.dart';
 import '../../auth/data/auth_service.dart';
 import '../../voices/data/voice_library_repository.dart';
+import '../../voices/domain/voice_folder.dart';
 import '../../voices/domain/voice_job.dart';
 import '../domain/room.dart';
 import '../presentation/room_demo_data.dart';
@@ -44,6 +45,42 @@ class RoomRepository {
         .toList(growable: false);
   }
 
+  Future<RoomBrowsePage> discoverRooms({int page = 0, int size = 20}) async {
+    if (!await usesRemote) {
+      final rooms = _mockRooms();
+      return RoomBrowsePage(
+        content: rooms,
+        totalElements: rooms.length,
+        totalPages: 1,
+        page: 0,
+        size: rooms.length,
+        first: true,
+        last: true,
+      );
+    }
+    final decoded = await _api.getJsonObject(
+      '/room/discover',
+      queryParameters: <String, String?>{
+        'page': '$page',
+        'size': '${size.clamp(1, 50)}',
+      },
+    );
+    final content = (decoded['content'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map(_roomFromJson)
+        .toList(growable: false);
+    return RoomBrowsePage(
+      content: content,
+      totalElements:
+          (decoded['totalElements'] as num?)?.toInt() ?? content.length,
+      totalPages: (decoded['totalPages'] as num?)?.toInt() ?? 1,
+      page: (decoded['page'] as num?)?.toInt() ?? page,
+      size: (decoded['size'] as num?)?.toInt() ?? size,
+      first: decoded['first'] as bool? ?? page == 0,
+      last: decoded['last'] as bool? ?? true,
+    );
+  }
+
   Future<Room> createRoom({
     required String title,
     required bool usePassword,
@@ -54,10 +91,9 @@ class RoomRepository {
       return Room(
         id: 'new-${DateTime.now().millisecondsSinceEpoch}',
         name: title,
-        inviteCode: 'FAM-${DateTime.now().millisecondsSinceEpoch % 10000}',
         joinPolicy: usePassword
-            ? RoomJoinPolicy.inviteCodeWithPassword
-            : RoomJoinPolicy.inviteCodeOnly,
+            ? RoomJoinPolicy.passwordProtected
+            : RoomJoinPolicy.public,
         maxParticipants: maxParticipants,
         members: const [
           RoomMember(id: 'me', displayName: '나', role: RoomMemberRole.owner),
@@ -69,11 +105,9 @@ class RoomRepository {
       '/room',
       body: <String, dynamic>{
         'title': title,
-        'joinPolicy': usePassword
-            ? 'INVITE_CODE_WITH_PASSWORD'
-            : 'INVITE_CODE_ONLY',
+        'joinPolicy': usePassword ? 'PASSWORD_PROTECTED' : 'PUBLIC',
         'maxParticipants': maxParticipants,
-        'password': usePassword ? (password ?? '') : '',
+        if (usePassword) 'password': password ?? '',
       },
     );
     return _roomFromJson(created);
@@ -93,11 +127,9 @@ class RoomRepository {
       '/room/$roomId',
       body: <String, dynamic>{
         'title': title,
-        'joinPolicy': usePassword
-            ? 'INVITE_CODE_WITH_PASSWORD'
-            : 'INVITE_CODE_ONLY',
+        'joinPolicy': usePassword ? 'PASSWORD_PROTECTED' : 'PUBLIC',
         'maxParticipants': maxParticipants,
-        'password': usePassword ? (password ?? '') : '',
+        if (usePassword) 'password': password ?? '',
       },
     );
     return _roomFromJson(updated);
@@ -146,20 +178,21 @@ class RoomRepository {
     return result;
   }
 
-  Future<Room> joinRoom({
-    required String inviteCode,
-    String? password,
-  }) async {
+  Future<Room> joinRoom({required String roomId, String? password}) async {
     if (!await usesRemote) {
       throw UnsupportedError('로그인이 필요해요.');
     }
-    final joined = await _api.postJsonObject(
-      '/room/join',
-      body: <String, dynamic>{
-        'inviteCode': inviteCode,
-        'password': password ?? '',
-      },
-    );
+    final trimmedRoomId = roomId.trim();
+    if (trimmedRoomId.isEmpty) {
+      throw ArgumentError('입장할 방을 선택해 주세요.');
+    }
+
+    final body = <String, dynamic>{
+      'roomId': int.tryParse(trimmedRoomId) ?? trimmedRoomId,
+      if (password != null && password.trim().isNotEmpty)
+        'password': password.trim(),
+    };
+    final joined = await _api.postJsonObject('/room/join', body: body);
     return _roomFromJson(joined);
   }
 
@@ -175,6 +208,7 @@ class RoomRepository {
     required Set<String> selectedVoiceIds,
     RoomVoiceAccessScope accessScopeForSelection =
         RoomVoiceAccessScope.listenOnly,
+
     /// 음성별 방에 보일 이름(voiceKey 등 external id 키). 비어 있거나 키 없으면 라이브러리 파일명 사용.
     Map<String, String>? shareDisplayTitlesByExternalVoiceId,
   }) async {
@@ -202,9 +236,7 @@ class RoomRepository {
     }
 
     final sharable = await loadSharableVoices();
-    final fileNameById = {
-      for (final v in sharable) v.id: v.fileName,
-    };
+    final fileNameById = {for (final v in sharable) v.id: v.fileName};
 
     final existing = await _api.getJsonList('/room/${room.id}/voice-shares');
     final existingShares = existing
@@ -237,8 +269,7 @@ class RoomRepository {
         fileNameById: fileNameById,
       );
       final scopeChanged = share.accessScope != accessScopeForSelection;
-      final titleChanged =
-          desiredTitle.trim() != share.voiceTitle.trim();
+      final titleChanged = desiredTitle.trim() != share.voiceTitle.trim();
       if (!scopeChanged && !titleChanged) continue;
 
       await _api.putJsonObject(
@@ -270,7 +301,10 @@ class RoomRepository {
     }
 
     /// POST 직후 `GET …/voice-shares` 가 아직 빈 목록을 줄 때가 있어, 반영까지 폴링합니다.
-    return _reloadRoomDetailWhenSharesInclude(room, mustIncludeVoiceKeys: toAdd);
+    return _reloadRoomDetailWhenSharesInclude(
+      room,
+      mustIncludeVoiceKeys: toAdd,
+    );
   }
 
   /// 공유 레코드 한 건 수정: `PUT /room/{roomId}/voice-shares/{shareId}`
@@ -282,17 +316,19 @@ class RoomRepository {
   }) async {
     if (!await usesRemote) {
       final t = shareDisplayTitle.trim();
-      final nextVoices = room.sharedVoices.map((v) {
-        if (v.id != shareRecordId) return v;
-        return v.copyWith(
-          voiceTitle: t.isEmpty ? v.voiceTitle : t,
-          accessScope: accessScope,
-          subtitle: switch (accessScope) {
-            RoomVoiceAccessScope.listenOnly => '듣기 전용',
-            RoomVoiceAccessScope.downloadAllowed => '다운로드 허용',
-          },
-        );
-      }).toList(growable: false);
+      final nextVoices = room.sharedVoices
+          .map((v) {
+            if (v.id != shareRecordId) return v;
+            return v.copyWith(
+              voiceTitle: t.isEmpty ? v.voiceTitle : t,
+              accessScope: accessScope,
+              subtitle: switch (accessScope) {
+                RoomVoiceAccessScope.listenOnly => '듣기 전용',
+                RoomVoiceAccessScope.downloadAllowed => '다운로드 허용',
+              },
+            );
+          })
+          .toList(growable: false);
       return room.copyWith(sharedVoices: nextVoices);
     }
 
@@ -338,7 +374,23 @@ class RoomRepository {
     return lastDetail!;
   }
 
-  /// 방 공유 음성 클론 합성. 백엔드: `POST /room/{roomId}/voice-shares/{shareId}/text-to-speech`
+  /// 다운로드 허용 공유를 내 라이브러리에 추가합니다.
+  /// 서버: `POST /room/{roomId}/voice-shares/{shareId}/claim`
+  Future<VoiceJob> claimRoomSharedVoice({
+    required String roomId,
+    required String shareId,
+  }) async {
+    if (!await usesRemote) {
+      throw UnsupportedError('로그인 후에만 공유 음성을 내 음성에 추가할 수 있어요.');
+    }
+    final response = await _api.postJsonObject(
+      '/room/$roomId/voice-shares/$shareId/claim',
+      successCodes: const {200},
+    );
+    return _ownedVoiceFromJson(response);
+  }
+
+  /// 레거시 방 공유 음성 합성. 신규 명세에서는 claim 후 `POST /voices/{ownershipId}/text-to-speech` 를 사용합니다.
   Future<VoiceSynthesisResult> synthesizeRoomSharedSpeech({
     required String roomId,
     required String shareId,
@@ -387,7 +439,9 @@ class RoomRepository {
 
   /// 다운로드 허용 권한용 — 합성 결과 파일 형태 (`GET …/download`).
   Future<Uint8List> fetchGeneratedAudioDownload(int generatedAudioId) {
-    return _voiceLibraryRepository.fetchGeneratedAudioDownload(generatedAudioId);
+    return _voiceLibraryRepository.fetchGeneratedAudioDownload(
+      generatedAudioId,
+    );
   }
 
   List<Room> _mockRooms() {
@@ -396,10 +450,9 @@ class RoomRepository {
           (demo) => Room(
             id: demo.id,
             name: demo.name,
-            inviteCode: demo.inviteCode,
             joinPolicy: demo.requirePassword
-                ? RoomJoinPolicy.inviteCodeWithPassword
-                : RoomJoinPolicy.inviteCodeOnly,
+                ? RoomJoinPolicy.passwordProtected
+                : RoomJoinPolicy.public,
             members: [
               for (final name in demo.memberNames)
                 RoomMember(id: name, displayName: name),
@@ -442,15 +495,14 @@ int? _parseWireInt(dynamic v) {
 Room _roomFromJson(Map<String, dynamic> json) {
   final name = json['name'] as String?;
   final title = json['title'] as String?;
-  final resolvedName =
-      (name != null && name.isNotEmpty) ? name : (title ?? '');
+  final resolvedName = (name != null && name.isNotEmpty) ? name : (title ?? '');
   return Room(
     id: '${json['id']}',
     name: resolvedName,
-    inviteCode: '${json['inviteCode'] ?? ''}',
     ownerId: (json['ownerId'] as num?)?.toInt(),
     joinPolicy: _joinPolicyFromWire(json['joinPolicy'] as String?),
     maxParticipants: (json['maxParticipants'] as num?)?.toInt() ?? 0,
+    activeMemberCount: (json['activeMemberCount'] as num?)?.toInt(),
     createdAt:
         DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
     updatedAt:
@@ -478,21 +530,22 @@ RoomSharedVoice _sharedVoiceFromJson(Map<String, dynamic> json) {
   final canonicalId = _canonicalShareVoiceExternalId(json);
   final shareRowId = '${json['id']}';
   final rawRoomId = json['roomId'];
-  final roomIdStr =
-      rawRoomId == null ? null : rawRoomId.toString().trim().isEmpty
-          ? null
-          : rawRoomId.toString().trim();
+  final roomIdStr = rawRoomId == null
+      ? null
+      : rawRoomId.toString().trim().isEmpty
+      ? null
+      : rawRoomId.toString().trim();
   final rawVk = json['voiceKey'];
   final vkTrimmed = rawVk?.toString().trim() ?? '';
   final voiceKeyStr = vkTrimmed.isEmpty ? null : vkTrimmed;
 
   return RoomSharedVoice(
     id: shareRowId,
-    externalVoiceId:
-        canonicalId.isNotEmpty ? canonicalId : shareRowId,
+    externalVoiceId: canonicalId.isNotEmpty ? canonicalId : shareRowId,
     voiceTitle: json['voiceTitle'] as String? ?? '공유 음성',
     ownerName: json['ownerName'] as String? ?? '공유 음성',
-    ownershipId: _parseWireInt(json['ownershipId']) ??
+    ownershipId:
+        _parseWireInt(json['ownershipId']) ??
         _parseWireInt(json['voiceOwnershipId']),
     accessScope: accessScope,
     sharedAt:
@@ -519,14 +572,15 @@ RoomMember _memberFromJson(Map<String, dynamic> json) {
 
 RoomJoinPolicy _joinPolicyFromWire(String? wire) {
   return switch ((wire ?? '').toUpperCase()) {
-    'INVITE_CODE_WITH_PASSWORD' => RoomJoinPolicy.inviteCodeWithPassword,
-    _ => RoomJoinPolicy.inviteCodeOnly,
+    'PASSWORD_PROTECTED' => RoomJoinPolicy.passwordProtected,
+    _ => RoomJoinPolicy.public,
   };
 }
 
 RoomVoiceAccessScope _accessScopeFromWire(String? wire) {
   return switch ((wire ?? '').toUpperCase()) {
     'LISTEN_ONLY' => RoomVoiceAccessScope.listenOnly,
+
     /// 서버/구버전 데이터 호환: 합성 권한은 앱에서 지원하지 않아 듣기 전용으로 취급
     'SYNTHESIS_ALLOWED' => RoomVoiceAccessScope.listenOnly,
     'DOWNLOAD_ALLOWED' => RoomVoiceAccessScope.downloadAllowed,
@@ -539,4 +593,31 @@ String _accessScopeToWire(RoomVoiceAccessScope scope) {
     RoomVoiceAccessScope.listenOnly => 'LISTEN_ONLY',
     RoomVoiceAccessScope.downloadAllowed => 'DOWNLOAD_ALLOWED',
   };
+}
+
+String _ownedVoiceFolderId(Object? rawFolderId) {
+  if (rawFolderId == null) return VoiceFolder.uncategorizedId;
+  final value = rawFolderId.toString().trim();
+  if (value.isEmpty || value == '0' || value.toLowerCase() == 'null') {
+    return VoiceFolder.uncategorizedId;
+  }
+  return value;
+}
+
+VoiceJob _ownedVoiceFromJson(Map<String, dynamic> json) {
+  final acquiredBy = (json['acquiredBy'] as String? ?? '').toUpperCase();
+  return VoiceJob(
+    id: json['voiceKey'] as String? ?? json['externalVoiceId'] as String? ?? '',
+    fileName: json['title'] as String? ?? '공유 음성',
+    status: VoiceJobStatus.completed,
+    createdAt:
+        DateTime.tryParse(json['acquiredAt'] as String? ?? '') ??
+        DateTime.now(),
+    folderId: _ownedVoiceFolderId(json['folderId']),
+    ownershipId:
+        _parseWireInt(json['ownershipId']) ?? _parseWireInt(json['id']),
+    origin: acquiredBy == 'ROOM_SHARED'
+        ? VoiceOrigin.sharedRoom
+        : VoiceOrigin.uploaded,
+  );
 }

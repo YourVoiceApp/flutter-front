@@ -76,8 +76,7 @@ class _RoomHubPageState extends State<RoomHubPage> {
         !stackBox.hasSize) {
       return;
     }
-    final topLeft =
-        stackBox.globalToLocal(rowBox.localToGlobal(Offset.zero));
+    final topLeft = stackBox.globalToLocal(rowBox.localToGlobal(Offset.zero));
     const pad = 8.0;
     if (!mounted) return;
     setState(() {
@@ -113,24 +112,24 @@ class _RoomHubPageState extends State<RoomHubPage> {
   void _openRoom(Room room) {
     Navigator.of(context)
         .push<String?>(
-      MaterialPageRoute<String?>(
-        builder: (_) => RoomDetailPage(
-          initialRoom: room,
-          onRoomUpdated: (updated) {
-            setState(() {
-              final i = _rooms.indexWhere((r) => r.id == updated.id);
-              if (i >= 0) _rooms[i] = updated;
-            });
-          },
-        ),
-      ),
-    )
+          MaterialPageRoute<String?>(
+            builder: (_) => RoomDetailPage(
+              initialRoom: room,
+              onRoomUpdated: (updated) {
+                setState(() {
+                  final i = _rooms.indexWhere((r) => r.id == updated.id);
+                  if (i >= 0) _rooms[i] = updated;
+                });
+              },
+            ),
+          ),
+        )
         .then((deletedId) {
-      if (!mounted || deletedId == null) return;
-      setState(() {
-        _rooms = _rooms.where((r) => r.id != deletedId).toList();
-      });
-    });
+          if (!mounted || deletedId == null) return;
+          setState(() {
+            _rooms = _rooms.where((r) => r.id != deletedId).toList();
+          });
+        });
   }
 
   Future<void> _openJoinFlow() async {
@@ -138,10 +137,7 @@ class _RoomHubPageState extends State<RoomHubPage> {
     if (!mounted) return;
     final navigator = Navigator.of(context);
     final joined = await navigator.push<Room>(
-      MaterialPageRoute(
-        builder: (_) =>
-            RoomJoinPage(existingCodes: {for (final r in _rooms) r.inviteCode}),
-      ),
+      MaterialPageRoute(builder: (_) => const RoomJoinPage()),
     );
     if (!mounted || joined == null) return;
     if (_rooms.every((r) => r.id != joined.id)) {
@@ -265,7 +261,7 @@ class _RoomHubPageState extends State<RoomHubPage> {
               child: SpotlightCoachOverlay(
                 holeRect: _hubHole!,
                 title: '방 만들기 · 입장',
-                body: '새 방을 만들거나, 코드로 들어올 수 있어요.',
+                body: '새 방을 만들거나, 전체 방 목록에서 바로 들어올 수 있어요.',
                 tapHint: '👉 마음에 드는 쪽을 눌러봐',
                 holeRadius: 16,
               ),
@@ -323,7 +319,7 @@ Widget _heroCard(BuildContext context) {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                '같은 방에 초대된 사람들만,\n서로 학습해 둔 목소리를 골라 쓸 수 있어요.',
+                '같은 방에 들어온 사람들끼리,\n서로 학습해 둔 목소리를 골라 쓸 수 있어요.',
                 style: TextStyle(
                   color: YeolpumtaTheme.textPrimary,
                   fontSize: 15,
@@ -336,7 +332,7 @@ Widget _heroCard(BuildContext context) {
         ),
         const SizedBox(height: 12),
         Text(
-          '방장이 방을 만들면 초대 코드가 생기고, 비밀번호를 켜 두면 코드 + 암호로만 들어올 수 있어요. (지금은 화면만 연결됨)',
+          '방을 만들면 전체 방 목록에 표시돼요. 공개방은 바로 입장하고, 비밀번호방은 암호를 입력해 들어와요.',
           style: TextStyle(
             color: YeolpumtaTheme.textSecondary,
             fontSize: 13,
@@ -405,7 +401,7 @@ class _RoomEntryTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '코드 ${room.inviteCode} · 멤버 ${room.memberNames.length}명 · 공유 음성 ${room.sharedVoices.length}개',
+                        '${room.requiresPassword ? '비밀번호방' : '공개방'} · 멤버 ${room.memberCount}명 · 공유 음성 ${room.sharedVoices.length}개',
                         style: TextStyle(
                           color: YeolpumtaTheme.textSecondary,
                           fontSize: 12,

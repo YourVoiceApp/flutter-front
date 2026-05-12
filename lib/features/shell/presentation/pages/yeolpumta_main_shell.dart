@@ -25,15 +25,11 @@ import '../../../onboarding/presentation/widgets/tab_coach_overlay.dart';
 
 const _kTabCoachGuestHint = '지금은 둘러보기! 로그인하면 풀기능이에요.';
 
-const _tabCoachTitles = <String>[
-  '여기가 음성 홈이에요',
-  '함께 탭',
-  '마켓 탭',
-];
+const _tabCoachTitles = <String>['여기가 음성 홈이에요', '함께 탭', '마켓 탭'];
 
 const _tabCoachBodies = <String>[
   '「음성 녹음」이 시작점이에요. 폴더로 정리도 돼요.',
-  '방 만들고 코드로 들어와요. 안에서는 음성 나눠요.',
+  '방 만들고 목록에서 들어와요. 안에서는 음성 나눠요.',
   '듣기·판매 탭 나눠서 쇼핑해요.',
 ];
 
@@ -107,6 +103,12 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
 
   Future<void> _refreshVoiceFolderScope([String? folderId]) async {
     final snap = await _repo.refreshFolderContents(_data, folderId: folderId);
+    if (!mounted) return;
+    setState(() => _data = snap);
+  }
+
+  Future<void> _reloadVoiceLibrary() async {
+    final snap = await _repo.load();
     if (!mounted) return;
     setState(() => _data = snap);
   }
@@ -562,14 +564,20 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index.clamp(0, 2),
         onDestinationSelected: (i) async {
+          final nextIndex = i.clamp(0, 2);
           setState(() {
-            _index = i.clamp(0, 2);
+            _index = nextIndex;
             _showTabCoach = false;
           });
+          if (nextIndex == 0) {
+            await _reloadVoiceLibrary();
+          }
           final v = await _premiumRepo.isAdsRemoved();
           if (mounted) setState(() => _adsRemoved = v);
           if (mounted) {
-            WidgetsBinding.instance.addPostFrameCallback((_) => _syncTabCoach());
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => _syncTabCoach(),
+            );
           }
         },
         destinations: const [

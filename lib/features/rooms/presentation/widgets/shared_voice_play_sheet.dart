@@ -12,8 +12,8 @@ import '../../../voices/domain/voice_job.dart';
 import '../../data/room_repository.dart';
 import '../../domain/room.dart';
 
-/// 공유 음성 「사용」→ 보유 음성과 동일하게 `POST /voices/{ownershipId}/text-to-speech` 우선,
-/// 불가 시 `POST /room/.../voice-shares/.../text-to-speech`. 미로그인은 기기 TTS.
+/// 공유 음성 「사용」→ 다운로드 허용 공유는 claim 후 보유 음성과 동일하게
+/// `POST /voices/{ownershipId}/text-to-speech` 를 사용합니다. 미로그인은 기기 TTS.
 Future<void> showSharedVoicePlaySheet(
   BuildContext context, {
   required String roomId,
@@ -62,6 +62,8 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
   bool _speaking = false;
   bool _listening = false;
   bool _synthesizing = false;
+  bool _claiming = false;
+  VoiceJob? _claimedJob;
 
   /// 마이크 세션 시작 시점의 텍스트(앞에 붙는 문장)
   String _anchorBeforeMic = '';
@@ -205,44 +207,13 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
       }
     }
 
-    int? resolvedOwnershipId() {
-      final fromShare = widget.voice.ownershipId;
-      if (fromShare != null && fromShare > 0) return fromShare;
-
-      final ext = widget.voice.externalVoiceId.trim();
-      final vk = (widget.voice.voiceKey ?? '').trim();
-      for (final job in widget.libraryJobs) {
-        final oid = job.ownershipId;
-        if (oid == null || oid <= 0) continue;
-        if (job.id == ext || (vk.isNotEmpty && job.id == vk)) {
-          return oid;
-        }
-      }
-      final parsed = int.tryParse(ext) ??
-          (vk.isNotEmpty ? int.tryParse(vk) : null);
-      if (parsed != null && parsed > 0) return parsed;
-      return null;
-    }
-
     Future<VoiceSynthesisResult> requestSynthesis() async {
-      final oid = resolvedOwnershipId();
-      if (oid != null) {
-        try {
-          return await _roomRepository.synthesizeOwnedVoiceSpeech(
-            ownershipId: oid,
-            text: t,
-          );
-        } catch (_) {
-          return await _roomRepository.synthesizeRoomSharedSpeech(
-            roomId: widget.roomId,
-            shareId: widget.voice.id,
-            text: t,
-          );
-        }
+      final oid = await _ensureOwnershipIdForServer();
+      if (oid == null) {
+        throw StateError('내 음성에 추가할 수 있는 공유만 서버 음색으로 합성할 수 있어요.');
       }
-      return await _roomRepository.synthesizeRoomSharedSpeech(
-        roomId: widget.roomId,
-        shareId: widget.voice.id,
+      return _roomRepository.synthesizeOwnedVoiceSpeech(
+        ownershipId: oid,
         text: t,
       );
     }
@@ -266,10 +237,7 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
           _speaking = false;
           _synthesizing = false;
         });
-        showToast(
-          context,
-          '서버 음색 합성에 실패했어요. ($e)',
-        );
+        showToast(context, '서버 음색 합성에 실패했어요. ($e)');
         await playDeviceTts();
         return;
       }
@@ -278,10 +246,77 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
     final remote = await _roomRepository.usesRemote;
     if (!mounted) return;
     setState(() => _hasRemoteSession = remote);
-    if (remote) {
+    if (remote && _canUseServerVoice) {
       await playServerSynth();
     } else {
+      if (remote && !_canUseServerVoice) {
+        showToast(context, '듣기 전용 공유는 내 음성에 추가할 수 없어 기기 목소리로 재생해요.');
+      }
       await playDeviceTts();
+    }
+  }
+
+  int? _resolvedOwnershipId() {
+    final fromClaim = _claimedJob?.ownershipId;
+    if (fromClaim != null && fromClaim > 0) return fromClaim;
+
+    final fromShare = widget.voice.ownershipId;
+    if (fromShare != null && fromShare > 0) return fromShare;
+
+    final ext = widget.voice.externalVoiceId.trim();
+    final vk = (widget.voice.voiceKey ?? '').trim();
+    for (final job in widget.libraryJobs) {
+      final oid = job.ownershipId;
+      if (oid == null || oid <= 0) continue;
+      if (job.id == ext || (vk.isNotEmpty && job.id == vk)) {
+        return oid;
+      }
+    }
+    return null;
+  }
+
+  bool get _canUseServerVoice =>
+      _resolvedOwnershipId() != null ||
+      widget.voice.accessScope == RoomVoiceAccessScope.downloadAllowed;
+
+  Future<int?> _ensureOwnershipIdForServer({bool showSuccess = false}) async {
+    final existing = _resolvedOwnershipId();
+    if (existing != null) return existing;
+
+    if (widget.voice.accessScope != RoomVoiceAccessScope.downloadAllowed) {
+      return null;
+    }
+
+    if (mounted) setState(() => _claiming = true);
+    try {
+      final claimed = await _roomRepository.claimRoomSharedVoice(
+        roomId: widget.roomId,
+        shareId: widget.voice.id,
+      );
+      final ownershipId = claimed.ownershipId;
+      if (ownershipId == null || ownershipId <= 0) {
+        throw StateError('클레임 응답에 ownershipId가 없어요.');
+      }
+      if (!mounted) return ownershipId;
+      setState(() => _claimedJob = claimed);
+      if (showSuccess) {
+        showToast(context, '내 음성에 추가했어요.');
+      }
+      return ownershipId;
+    } finally {
+      if (mounted) setState(() => _claiming = false);
+    }
+  }
+
+  Future<void> _claimSharedVoice() async {
+    if (widget.voice.accessScope != RoomVoiceAccessScope.downloadAllowed) {
+      showToast(context, '이 공유는 듣기 전용이라 내 음성에 추가할 수 없어요.');
+      return;
+    }
+    try {
+      await _ensureOwnershipIdForServer(showSuccess: true);
+    } catch (e) {
+      if (mounted) showToast(context, '내 음성에 추가하지 못했어요. ($e)');
     }
   }
 
@@ -305,20 +340,18 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
     final synthLine = remote == null
         ? '로그인 상태를 확인하는 중이에요.'
         : remote
-        ? '공유된 클론 음성으로 문장을 합성해 들려요. (방 공유 TTS API)'
+        ? '내 음성에 추가된 공유는 서버 음색으로 합성해 들려요.'
         : '로그인하면 공유 음색으로 합성해 들을 수 있어요. 지금은 기기 목소리(TTS)로 재생돼요.';
     final scopeLine = switch (widget.voice.accessScope) {
-      RoomVoiceAccessScope.listenOnly =>
-        '다른 사람은 이 음성 파일을 내려받을 수 없어요(듣기만).',
+      RoomVoiceAccessScope.listenOnly => '듣기 전용 공유는 내 음성에 추가할 수 없어요.',
       RoomVoiceAccessScope.downloadAllowed =>
-        '다운로드 허용: 합성 결과 파일 저장 등은 추후 연동 예정이에요.',
+        '다운로드 허용 공유는 「내 음성에 추가」 후 TTS에 사용할 수 있어요.',
     };
     return '$synthLine $scopeLine';
   }
 
   /// 원격 합성이 아닐 때만 기기 TTS 준비가 필요함
-  bool get _blockListenUntilTts =>
-      _hasRemoteSession != true && !_ttsReady;
+  bool get _blockListenUntilTts => _hasRemoteSession != true && !_ttsReady;
 
   @override
   Widget build(BuildContext context) {
@@ -404,6 +437,38 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                   height: 1.4,
                 ),
               ),
+              if (widget.voice.accessScope ==
+                  RoomVoiceAccessScope.downloadAllowed) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: (_claiming || _synthesizing || _speaking)
+                      ? null
+                      : _claimSharedVoice,
+                  icon: Icon(
+                    _resolvedOwnershipId() != null
+                        ? Icons.check_circle_rounded
+                        : Icons.download_rounded,
+                    color: YeolpumtaTheme.accent,
+                  ),
+                  label: Text(
+                    _claiming
+                        ? '추가 중…'
+                        : (_resolvedOwnershipId() != null
+                              ? '내 음성에 추가됨'
+                              : '내 음성에 추가'),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    foregroundColor: YeolpumtaTheme.accent,
+                    side: BorderSide(
+                      color: YeolpumtaTheme.accent.withValues(alpha: 0.45),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
               TextField(
                 controller: _textCtrl,
@@ -457,10 +522,11 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                     child: FilledButton.icon(
                       onPressed:
                           (_blockListenUntilTts ||
-                                  _speaking ||
-                                  _synthesizing)
-                              ? null
-                              : _speak,
+                              _speaking ||
+                              _claiming ||
+                              _synthesizing)
+                          ? null
+                          : _speak,
                       icon: Icon(
                         _synthesizing
                             ? Icons.hourglass_top_rounded
@@ -470,7 +536,7 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
                       ),
                       label: Text(
                         _synthesizing
-                            ? '합성 중…'
+                            ? (_claiming ? '추가 중…' : '합성 중…')
                             : (_speaking ? '재생 중…' : '듣기'),
                       ),
                       style: FilledButton.styleFrom(
@@ -504,13 +570,17 @@ class _SharedVoicePlaySheetState extends State<_SharedVoicePlaySheet> {
               const SizedBox(height: 10),
               TextButton.icon(
                 onPressed:
-                    (!_blockListenUntilTts && !_synthesizing)
-                        ? () async {
-                            await _stop();
-                            await _speak();
-                          }
-                        : null,
-                icon: Icon(Icons.replay_rounded, size: 20, color: YeolpumtaTheme.accent),
+                    (!_blockListenUntilTts && !_claiming && !_synthesizing)
+                    ? () async {
+                        await _stop();
+                        await _speak();
+                      }
+                    : null,
+                icon: Icon(
+                  Icons.replay_rounded,
+                  size: 20,
+                  color: YeolpumtaTheme.accent,
+                ),
                 label: Text(
                   '처음부터 다시 듣기',
                   style: TextStyle(

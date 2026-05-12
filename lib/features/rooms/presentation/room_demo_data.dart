@@ -3,7 +3,6 @@ class RoomDemo {
   const RoomDemo({
     required this.id,
     required this.name,
-    required this.inviteCode,
     this.requirePassword = false,
     this.memberNames = const [],
     this.sharedVoices = const [],
@@ -11,7 +10,6 @@ class RoomDemo {
 
   final String id;
   final String name;
-  final String inviteCode;
   final bool requirePassword;
   final List<String> memberNames;
   final List<SharedVoiceDemo> sharedVoices;
@@ -25,7 +23,6 @@ class RoomDemo {
     return RoomDemo(
       id: id,
       name: name ?? this.name,
-      inviteCode: inviteCode,
       requirePassword: requirePassword ?? this.requirePassword,
       memberNames: memberNames ?? this.memberNames,
       sharedVoices: sharedVoices ?? this.sharedVoices,
@@ -52,7 +49,6 @@ final List<RoomDemo> kMockJoinedRooms = [
   RoomDemo(
     id: 'r1',
     name: '우리 가족 방',
-    inviteCode: 'FAM-7K2Q',
     requirePassword: true,
     memberNames: ['엄마', '아빠', '나'],
     sharedVoices: [
@@ -73,7 +69,6 @@ final List<RoomDemo> kMockJoinedRooms = [
   RoomDemo(
     id: 'r2',
     name: '사촌 모임',
-    inviteCode: 'KIN-9P1M',
     memberNames: ['민수', '서연', '지후'],
     sharedVoices: [
       SharedVoiceDemo(

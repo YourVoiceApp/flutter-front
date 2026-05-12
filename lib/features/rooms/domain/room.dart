@@ -1,4 +1,4 @@
-enum RoomJoinPolicy { inviteCodeOnly, inviteCodeWithPassword }
+enum RoomJoinPolicy { public, passwordProtected }
 
 enum RoomVoiceAccessScope { listenOnly, downloadAllowed }
 
@@ -35,6 +35,7 @@ class RoomSharedVoice {
   /// 공유 레코드 id — `DELETE`/`PUT …/voice-shares/{shareId}` 경로용
   final String id;
   final String voiceTitle;
+
   /// 클론 음성 식별(라이브러리와 동일 키)
   final String externalVoiceId;
   final String ownerName;
@@ -44,8 +45,10 @@ class RoomSharedVoice {
   final RoomVoiceAccessScope accessScope;
   final DateTime? sharedAt;
   final String? subtitle;
+
   /// API `roomId` (있을 때만)
   final String? roomId;
+
   /// API `voiceKey` (있을 때만, 보통 externalVoiceId 와 동일)
   final String? voiceKey;
 
@@ -80,57 +83,76 @@ class Room {
   const Room({
     required this.id,
     required this.name,
-    required this.inviteCode,
     this.ownerId,
-    this.joinPolicy = RoomJoinPolicy.inviteCodeOnly,
+    this.joinPolicy = RoomJoinPolicy.public,
     this.maxParticipants = 0,
     this.createdAt,
     this.updatedAt,
+    this.activeMemberCount,
     this.members = const [],
     this.sharedVoices = const [],
   });
 
   final String id;
   final String name;
-  final String inviteCode;
   final int? ownerId;
   final RoomJoinPolicy joinPolicy;
   final int maxParticipants;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final int? activeMemberCount;
   final List<RoomMember> members;
   final List<RoomSharedVoice> sharedVoices;
 
-  bool get requiresPassword =>
-      joinPolicy == RoomJoinPolicy.inviteCodeWithPassword;
+  bool get requiresPassword => joinPolicy == RoomJoinPolicy.passwordProtected;
 
-  int get memberCount => members.length;
+  int get memberCount => activeMemberCount ?? members.length;
 
   List<String> get memberNames =>
       members.map((member) => member.displayName).toList(growable: false);
 
   Room copyWith({
     String? name,
-    String? inviteCode,
     int? ownerId,
     RoomJoinPolicy? joinPolicy,
     int? maxParticipants,
     DateTime? createdAt,
     DateTime? updatedAt,
+    int? activeMemberCount,
     List<RoomMember>? members,
     List<RoomSharedVoice>? sharedVoices,
   }) {
     return Room(
       id: id,
       name: name ?? this.name,
-      inviteCode: inviteCode ?? this.inviteCode,
       ownerId: ownerId ?? this.ownerId,
       joinPolicy: joinPolicy ?? this.joinPolicy,
       maxParticipants: maxParticipants ?? this.maxParticipants,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      activeMemberCount: activeMemberCount ?? this.activeMemberCount,
       members: members ?? this.members,
       sharedVoices: sharedVoices ?? this.sharedVoices,
     );
   }
+}
+
+class RoomBrowsePage {
+  const RoomBrowsePage({
+    required this.content,
+    required this.totalElements,
+    required this.totalPages,
+    required this.page,
+    required this.size,
+    required this.first,
+    required this.last,
+  });
+
+  final List<Room> content;
+  final int totalElements;
+  final int totalPages;
+  final int page;
+  final int size;
+  final bool first;
+  final bool last;
 }

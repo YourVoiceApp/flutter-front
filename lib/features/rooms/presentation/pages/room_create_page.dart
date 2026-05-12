@@ -47,7 +47,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
         maxParticipants: 3,
       );
       if (!mounted) return;
-      showToast(context, '방이 만들어졌어요. 초대 코드를 공유해 보세요.');
+      showToast(context, '방이 만들어졌어요.');
       Navigator.of(context).pop<Room>(room);
     } catch (e) {
       if (!mounted) return;
@@ -70,7 +70,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '가족이나 지인만 들어올 수 있게 방을 열고, 초대 코드를 나눠 주세요.',
+                  '공개방은 누구나 목록에서 들어올 수 있고, 비밀번호방은 암호를 아는 사람만 입장할 수 있어요.',
                   style: TextStyle(
                     color: YeolpumtaTheme.textSecondary,
                     fontSize: 14,
@@ -89,7 +89,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(
-                    '비밀번호로 입장만 허용',
+                    '비밀번호방으로 만들기',
                     style: TextStyle(
                       color: YeolpumtaTheme.textPrimary,
                       fontWeight: FontWeight.w600,
@@ -97,7 +97,7 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                     ),
                   ),
                   subtitle: Text(
-                    '초대 코드와 함께 암호를 아는 사람만 입장 (데모)',
+                    '전체 방 목록에서 선택한 뒤 암호를 입력해야 입장할 수 있어요.',
                     style: TextStyle(
                       fontSize: 12,
                       color: YeolpumtaTheme.textSecondary,
@@ -106,7 +106,9 @@ class _RoomCreatePageState extends State<RoomCreatePage> {
                   ),
                   value: _usePassword,
                   activeThumbColor: YeolpumtaTheme.accent,
-                  activeTrackColor: YeolpumtaTheme.accent.withValues(alpha: 0.35),
+                  activeTrackColor: YeolpumtaTheme.accent.withValues(
+                    alpha: 0.35,
+                  ),
                   onChanged: (v) => setState(() => _usePassword = v),
                 ),
                 if (_usePassword) ...[

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../app/services/app_services.dart';
@@ -6,9 +8,10 @@ import '../../../auth/data/user_profile_repository.dart';
 import '../../../auth/domain/user_profile.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 import '../../../auth/presentation/pages/my_page.dart';
-import '../../../marketplace/presentation/pages/market_hub_page.dart';
 import '../../../monetization/data/premium_repository.dart';
 import '../../../monetization/presentation/pages/ads_removal_paywall_page.dart';
+import '../../../monetization/presentation/widgets/app_banner_ad.dart';
+import '../../../monetization/presentation/widgets/app_native_ad_card.dart';
 import '../../../rooms/presentation/pages/room_hub_page.dart';
 import '../../../shared/presentation/pages/placeholder_page.dart';
 import '../../../voices/data/voice_library_repository.dart';
@@ -25,15 +28,14 @@ import '../../../onboarding/presentation/widgets/tab_coach_overlay.dart';
 
 const _kTabCoachGuestHint = '지금은 둘러보기! 로그인하면 풀기능이에요.';
 
-const _tabCoachTitles = <String>['여기가 음성 홈이에요', '함께 탭', '마켓 탭'];
+const _tabCoachTitles = <String>['여기가 음성 홈이에요', '함께 탭'];
 
 const _tabCoachBodies = <String>[
   '「음성 녹음」이 시작점이에요. 폴더로 정리도 돼요.',
   '방 만들고 목록에서 들어와요. 안에서는 음성 나눠요.',
-  '듣기·판매 탭 나눠서 쇼핑해요.',
 ];
 
-/// 핵심만: 음성 · 함께 · 마켓 (듣기는 음성 카드에서)
+/// 핵심만: 음성 · 함께 (듣기는 음성 카드에서)
 class YeolpumtaMainShell extends StatefulWidget {
   const YeolpumtaMainShell({super.key, this.isGuestMode = false});
 
@@ -57,6 +59,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
   UserProfile? _profile;
   bool _ready = false;
   bool _adsRemoved = false;
+  bool _showInitialVoiceNativeAd = true;
 
   int _index = 0;
   bool _showTabCoach = false;
@@ -83,19 +86,19 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
 
   Future<void> _syncTabCoach() async {
     if (!_ready || !mounted) return;
-    final tab = _index.clamp(0, 2);
+    final tab = _index.clamp(0, 1);
     if (tab == 0) {
       setState(() => _showTabCoach = false);
       return;
     }
     final dismissed = await OnboardingPrefs.isShellTabCoachDismissed(tab);
     if (!mounted) return;
-    if (_index.clamp(0, 2) != tab) return;
+    if (_index.clamp(0, 1) != tab) return;
     setState(() => _showTabCoach = !dismissed);
   }
 
   Future<void> _dismissTabCoach() async {
-    final tab = _index.clamp(0, 2);
+    final tab = _index.clamp(0, 1);
     await OnboardingPrefs.setShellTabCoachDismissed(tab);
     if (!mounted) return;
     setState(() => _showTabCoach = false);
@@ -112,9 +115,6 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
     if (!mounted) return;
     setState(() => _data = snap);
   }
-
-  List<VoiceJob> get _completed =>
-      _data.jobs.where((j) => j.status == VoiceJobStatus.completed).toList();
 
   Future<String> _createFolderForUpload(
     String name,
@@ -350,7 +350,7 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
 
   @override
   Widget build(BuildContext context) {
-    const titles = ['음성', '함께', '마켓'];
+    const titles = ['음성', '함께'];
 
     if (!_ready) {
       return const Scaffold(
@@ -521,82 +521,180 @@ class _YeolpumtaMainShellState extends State<YeolpumtaMainShell> {
         ),
         title: Text(titles[_index.clamp(0, titles.length - 1)]),
       ),
-      body: Stack(
-        fit: StackFit.expand,
+      body: Column(
         children: [
-          Positioned.fill(
-            child: IndexedStack(
-              index: _index.clamp(0, 2),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                VoicePipelinePage(
-                  jobs: _data.jobs,
-                  folders: _data.folders,
-                  onUploadTap: _openUpload,
-                  onDirectRecordTap: _openDirectRecord,
-                  onOpenFolderManage: _openFolderManage,
-                  onCreateFolder: _createFolderForUpload,
-                  onRefreshScope: _refreshVoiceFolderScope,
-                  onAdvanceDemo: _advanceDemo,
-                  onDeleteJob: _deleteJob,
-                  onMoveJob: _moveJob,
-                  onRenameJob: _renameJob,
-                  onListenTap: _openListen,
+                Positioned.fill(
+                  child: IndexedStack(
+                    index: _index.clamp(0, 1),
+                    children: [
+                      if (!_adsRemoved && _showInitialVoiceNativeAd)
+                        _InitialVoiceNativeAdGate(
+                          onClose: () =>
+                              setState(() => _showInitialVoiceNativeAd = false),
+                        )
+                      else
+                        VoicePipelinePage(
+                          jobs: _data.jobs,
+                          folders: _data.folders,
+                          onUploadTap: _openUpload,
+                          onDirectRecordTap: _openDirectRecord,
+                          onOpenFolderManage: _openFolderManage,
+                          onCreateFolder: _createFolderForUpload,
+                          onRefreshScope: _refreshVoiceFolderScope,
+                          onAdvanceDemo: _advanceDemo,
+                          onDeleteJob: _deleteJob,
+                          onMoveJob: _moveJob,
+                          onRenameJob: _renameJob,
+                          onListenTap: _openListen,
+                        ),
+                      const RoomHubPage(embeddedInMainShell: true),
+                    ],
+                  ),
                 ),
-                const RoomHubPage(embeddedInMainShell: true),
-                MarketHubPage(
-                  completedJobs: _completed,
-                  premiumRepository: _premiumRepo,
-                ),
+                if (_showTabCoach)
+                  TabCoachOverlay(
+                    tabIndex: _index.clamp(0, 1),
+                    title: _tabCoachTitles[_index.clamp(0, 1)],
+                    body: _tabCoachBodies[_index.clamp(0, 1)],
+                    guestHint: widget.isGuestMode ? _kTabCoachGuestHint : null,
+                    onGotIt: _dismissTabCoach,
+                    onBarrierTap: () => setState(() => _showTabCoach = false),
+                  ),
               ],
             ),
           ),
-          if (_showTabCoach)
-            TabCoachOverlay(
-              tabIndex: _index.clamp(0, 2),
-              title: _tabCoachTitles[_index.clamp(0, 2)],
-              body: _tabCoachBodies[_index.clamp(0, 2)],
-              guestHint: widget.isGuestMode ? _kTabCoachGuestHint : null,
-              onGotIt: _dismissTabCoach,
-              onBarrierTap: () => setState(() => _showTabCoach = false),
-            ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index.clamp(0, 2),
-        onDestinationSelected: (i) async {
-          final nextIndex = i.clamp(0, 2);
-          setState(() {
-            _index = nextIndex;
-            _showTabCoach = false;
-          });
-          if (nextIndex == 0) {
-            await _reloadVoiceLibrary();
-          }
-          final v = await _premiumRepo.isAdsRemoved();
-          if (mounted) setState(() => _adsRemoved = v);
-          if (mounted) {
-            WidgetsBinding.instance.addPostFrameCallback(
-              (_) => _syncTabCoach(),
-            );
-          }
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.audio_file_outlined),
-            selectedIcon: Icon(Icons.audio_file_rounded),
-            label: '음성',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.group_outlined),
-            selectedIcon: Icon(Icons.group_rounded),
-            label: '함께',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.storefront_outlined),
-            selectedIcon: Icon(Icons.storefront_rounded),
-            label: '마켓',
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!_adsRemoved) const AppBannerAd(),
+          NavigationBar(
+            selectedIndex: _index.clamp(0, 1),
+            onDestinationSelected: (i) async {
+              final nextIndex = i.clamp(0, 1);
+              setState(() {
+                _index = nextIndex;
+                _showTabCoach = false;
+                if (nextIndex != 0) {
+                  _showInitialVoiceNativeAd = false;
+                }
+              });
+              if (nextIndex == 0) {
+                await _reloadVoiceLibrary();
+              }
+              final v = await _premiumRepo.isAdsRemoved();
+              if (mounted) setState(() => _adsRemoved = v);
+              if (mounted) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => _syncTabCoach(),
+                );
+              }
+            },
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.audio_file_outlined),
+                selectedIcon: Icon(Icons.audio_file_rounded),
+                label: '음성',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.group_outlined),
+                selectedIcon: Icon(Icons.group_rounded),
+                label: '함께',
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _InitialVoiceNativeAdGate extends StatefulWidget {
+  const _InitialVoiceNativeAdGate({required this.onClose});
+
+  final VoidCallback onClose;
+
+  @override
+  State<_InitialVoiceNativeAdGate> createState() =>
+      _InitialVoiceNativeAdGateState();
+}
+
+class _InitialVoiceNativeAdGateState extends State<_InitialVoiceNativeAdGate> {
+  Timer? _fallbackTimer;
+  bool _adLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fallbackTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (!mounted || _adLoaded) return;
+      widget.onClose();
+    });
+  }
+
+  @override
+  void dispose() {
+    _fallbackTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handleLoaded() {
+    _adLoaded = true;
+    _fallbackTimer?.cancel();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: YeolpumtaTheme.bg,
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+          children: [
+            Text(
+              '음성 홈으로 들어가기 전에',
+              style: TextStyle(
+                color: YeolpumtaTheme.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '짧은 추천 광고를 확인하면 바로 음성 탭을 사용할 수 있어요.',
+              style: TextStyle(
+                color: YeolpumtaTheme.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            AppNativeAdCard(
+              compact: true,
+              spotlight: true,
+              onClose: widget.onClose,
+              onLoaded: _handleLoaded,
+              onFailedToLoad: widget.onClose,
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: widget.onClose,
+              child: Text(
+                '광고 닫고 음성 탭으로 이동',
+                style: TextStyle(
+                  color: YeolpumtaTheme.accent,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

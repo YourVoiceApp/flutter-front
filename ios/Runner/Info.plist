@@ -47,6 +47,8 @@
 	<string>498950596222-p466hd9uk790neei25bm7jqsbuhkh8r2.apps.googleusercontent.com</string>
 	<key>GIDServerClientID</key>
 	<string>498950596222-ipue9oeqdnsug7jt8rl0i77v5shrj06p.apps.googleusercontent.com</string>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~1458002511</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../../monetization/data/premium_repository.dart';
 import '../../../monetization/presentation/pages/ads_removal_paywall_page.dart';
+import '../../../monetization/presentation/widgets/app_native_ad_card.dart';
 import '../../../voices/domain/voice_job.dart';
 
 class MarketHubPage extends StatefulWidget {
@@ -20,23 +21,34 @@ class MarketHubPage extends StatefulWidget {
 }
 
 class _MarketHubPageState extends State<MarketHubPage> {
+  bool _adsRemoved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdsState();
+  }
+
+  Future<void> _loadAdsState() async {
+    final removed = await widget.premiumRepository.isAdsRemoved();
+    if (!mounted) return;
+    setState(() => _adsRemoved = removed);
+  }
 
   Future<void> _openPremium() async {
     final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (_) => AdsRemovalPaywallPage(
-          repository: widget.premiumRepository,
-        ),
+        builder: (_) =>
+            AdsRemovalPaywallPage(repository: widget.premiumRepository),
       ),
     );
-    if (ok == true && mounted) setState(() {});
+    if (ok == true && mounted) {
+      setState(() => _adsRemoved = true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 추후 기능 재오픈 시 true로 바꾸면 기존 UI를 다시 노출할 수 있음.
-    final showMarketUi = false;
-
     return ColoredBox(
       color: YeolpumtaTheme.bg,
       child: CustomScrollView(
@@ -60,36 +72,31 @@ class _MarketHubPageState extends State<MarketHubPage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (showMarketUi) ...[
-                    Text(
-                      '지금은 광고 제거만 제공해요.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.45,
-                        color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.92),
+                  Text(
+                    '앱과 어울리는 추천 광고와 광고 제거 옵션을 모아뒀어요.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.45,
+                      color: YeolpumtaTheme.textSecondary.withValues(
+                        alpha: 0.92,
                       ),
                     ),
-                    const SizedBox(height: 22),
-                    _YeolGroupedCard(
-                      children: [
-                        _YeolQuietRow(
-                          title: '듣기 화면 광고 끄기',
-                          caption: '음성에서 들을 때 나오는 광고와 같아요',
-                          trailing: '2,900원',
-                          onTap: _openPremium,
-                        ),
-                      ],
-                    ),
-                  ] else ...[
-                    Text(
-                      '준비 중입니다.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.45,
-                        color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.92),
-                      ),
-                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  if (!_adsRemoved) ...[
+                    const AppNativeAdCard(),
+                    const SizedBox(height: 18),
                   ],
+                  _YeolGroupedCard(
+                    children: [
+                      _YeolQuietRow(
+                        title: '광고 제거하기',
+                        caption: '배너와 추천 광고를 숨기고 더 깔끔하게 사용해요',
+                        trailing: '2,900원',
+                        onTap: _openPremium,
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -165,7 +172,9 @@ class _YeolQuietRow extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         height: 1.3,
-                        color: YeolpumtaTheme.textSecondary.withValues(alpha: 0.92),
+                        color: YeolpumtaTheme.textSecondary.withValues(
+                          alpha: 0.92,
+                        ),
                       ),
                     ),
                   ],
@@ -195,4 +204,3 @@ class _YeolQuietRow extends StatelessWidget {
     );
   }
 }
-

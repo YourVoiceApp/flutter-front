@@ -24,12 +24,19 @@ class AdMobConfig {
       'ca-app-pub-3940256099942544/2247696110';
   static const iosTestNativeAdUnitId = 'ca-app-pub-3940256099942544/3986624511';
 
-  /// Replace these with real AdMob ad unit IDs before release.
-  static const androidBannerAdUnitId = androidTestBannerAdUnitId;
+  /// Production Android AdMob IDs for 목음기.
+  static const androidAppId = 'ca-app-pub-8414309358374456~5076626495';
+  static const androidProductionBannerAdUnitId =
+      'ca-app-pub-8414309358374456/1652992040';
+  static const androidProductionNativeAdUnitId =
+      'ca-app-pub-8414309358374456/7907638118';
+
+  /// Replace iOS IDs with real AdMob ad unit IDs before iOS release.
+  static const androidBannerAdUnitId = androidProductionBannerAdUnitId;
   static const iosBannerAdUnitId = iosTestBannerAdUnitId;
   static const androidAppOpenAdUnitId = androidTestAppOpenAdUnitId;
   static const iosAppOpenAdUnitId = iosTestAppOpenAdUnitId;
-  static const androidNativeAdUnitId = androidTestNativeAdUnitId;
+  static const androidNativeAdUnitId = androidProductionNativeAdUnitId;
   static const iosNativeAdUnitId = iosTestNativeAdUnitId;
 
   static bool get supportsMobileAds {

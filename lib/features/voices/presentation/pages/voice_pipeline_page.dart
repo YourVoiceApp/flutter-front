@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/yeolpumta_theme.dart';
 import '../../../onboarding/data/onboarding_prefs.dart';
 import '../../../onboarding/presentation/widgets/spotlight_coach_overlay.dart';
+import '../../../onboarding/presentation/widgets/voice_record_tips_coach_sheet.dart';
 import '../../domain/voice_folder.dart';
 import '../../domain/voice_job.dart';
 import '../widgets/voice_capture_choice_sheet.dart';
@@ -345,7 +346,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
       case VoiceCaptureChoice.upload:
         await widget.onUploadTap(initial);
       case VoiceCaptureChoice.record:
-        await widget.onDirectRecordTap(initial);
+        await _openDirectRecordWithTips(initial);
     }
   }
 
@@ -364,8 +365,14 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
       case VoiceCaptureChoice.upload:
         await widget.onUploadTap();
       case VoiceCaptureChoice.record:
-        await widget.onDirectRecordTap();
+        await _openDirectRecordWithTips();
     }
+  }
+
+  Future<void> _openDirectRecordWithTips([String? initialFolderId]) async {
+    await showVoiceRecordTipsCoachIfNeeded(context);
+    if (!mounted) return;
+    await widget.onDirectRecordTap(initialFolderId);
   }
 
   Future<void> _onRootVoiceCaptureTap() async {
@@ -772,7 +779,7 @@ class _VoicePipelinePageState extends State<VoicePipelinePage> {
                   holeRect: _recordButtonHoleLocal!,
                   title: '시작은 여기!',
                   body:
-                      '가장 많이 쓰는 건 이 초록 버튼이에요. 누르면 파일 업로드·직접 녹음 중 골라서 진행할 수 있어요.',
+                      '가장 많이 쓰는 건 이 초록 버튼이에요. 직접 녹음은 5~10초 동안 또렷하게 말하면 돼요.',
                   tapHint: '👉 한번 눌러볼래?',
                   holeRadius: 18,
                 ),

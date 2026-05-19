@@ -18,6 +18,7 @@ class OnboardingPrefs {
   }
 
   static const _kVoiceRootCtaCoach = 'voice_root_cta_coach_v1';
+  static const _kVoiceRecordTips = 'voice_record_tips_coach_v1';
 
   static Future<bool> isVoiceRootCtaCoachDone() async {
     final p = await SharedPreferences.getInstance();
@@ -27,6 +28,16 @@ class OnboardingPrefs {
   static Future<void> setVoiceRootCtaCoachDone() async {
     final p = await SharedPreferences.getInstance();
     await p.setBool(_kVoiceRootCtaCoach, true);
+  }
+
+  static Future<bool> isVoiceRecordTipsDone() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getBool(_kVoiceRecordTips) ?? false;
+  }
+
+  static Future<void> setVoiceRecordTipsDone() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_kVoiceRecordTips, true);
   }
 
   static const _kRoomHubIntro = 'room_coach_hub_intro_v1';
@@ -81,6 +92,7 @@ class OnboardingPrefs {
       await p.remove(_shellCoachKey(i));
     }
     await p.remove(_kVoiceRootCtaCoach);
+    await p.remove(_kVoiceRecordTips);
     await p.remove(_kRoomHubIntro);
     await p.remove(_kRoomShareFab);
     await p.remove(_kMarketSegment);

@@ -106,7 +106,7 @@ class VoiceCaptureChoiceSheet extends StatelessWidget {
               ),
             ),
             subtitle: const Text(
-              '기기 마이크로 바로 녹음해요',
+              '5~10초, 또렷하게 말하면 등록이 잘 돼요',
               style: TextStyle(
                 fontSize: 13,
                 color: YeolpumtaTheme.textSecondary,
